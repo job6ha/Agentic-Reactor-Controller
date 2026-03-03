@@ -21,6 +21,30 @@ cp .env.example .env
 # .env 파일을 편집하여 필요한 값을 설정
 ```
 
+## 핵데이터 설치
+
+OpenMC 시뮬레이션에는 핵데이터(Cross Section) 라이브러리가 필요합니다.
+
+```bash
+# ENDF/B-VIII.0 다운로드 (기본, ~3GB)
+uv run python scripts/download_xs.py
+
+# 다른 라이브러리 선택
+uv run python scripts/download_xs.py --library endfb-vii.1
+
+# 사용 가능한 라이브러리 목록
+uv run python scripts/download_xs.py --list
+```
+
+설치 후 `.env`에 경로가 자동 설정되거나, 수동으로 설정할 수 있습니다:
+
+```bash
+# .env
+OPENMC_CROSS_SECTIONS=/path/to/nucdata/cross_sections.xml
+```
+
+미설정 시 `nucdata/` 디렉토리에서 자동 탐색합니다.
+
 ## 실행
 
 ```bash
