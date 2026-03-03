@@ -119,10 +119,11 @@ def run_case(
     *,
     openmc_command: str = "openmc",
 ) -> RunResult:
-    """상태 관리를 포함한 케이스 실행.
+    """상태 관리와 재시도를 포함한 케이스 실행.
 
     status.json을 queued→running→done/failed로 전이하면서
-    OpenMC를 실행한다.
+    OpenMC를 실행한다. max_retries > 0이면 실패 시 자동 재시도하며,
+    각 시도의 로그를 run_1.log, run_2.log 등으로 별도 보존한다.
 
     Args:
         run_config: 실행 설정.
@@ -130,26 +131,64 @@ def run_case(
         openmc_command: OpenMC 실행 명령어.
 
     Returns:
-        RunResult 실행 결과.
+        최종 RunResult 실행 결과.
     """
-    # running 상태로 전이
-    update_status(
-        case_dir,
-        StatusType.RUNNING,
-        increment_attempt=True,
-    )
+    max_attempts = run_config.max_retries + 1
+    result: RunResult | None = None
 
-    # OpenMC 실행
-    result = run_openmc(run_config, case_dir, openmc_command=openmc_command)
-
-    # 결과에 따라 done/failed 전이
-    if result.success:
-        update_status(case_dir, StatusType.DONE)
-    else:
-        update_status(
+    for attempt_idx in range(1, max_attempts + 1):
+        # running 상태로 전이
+        status = update_status(
             case_dir,
-            StatusType.FAILED,
-            error_message=f"exit_code={result.exit_code}",
+            StatusType.RUNNING,
+            increment_attempt=True,
+        )
+        current_attempt = status.attempt
+
+        logger.info(
+            "실행 시도 %d/%d: case=%s",
+            attempt_idx,
+            max_attempts,
+            case_dir.name,
         )
 
+        # OpenMC 실행 (attempt 번호로 로그 분리)
+        result = run_openmc(
+            run_config,
+            case_dir,
+            openmc_command=openmc_command,
+            attempt=current_attempt,
+        )
+
+        if result.success:
+            update_status(case_dir, StatusType.DONE)
+            return result
+
+        # 마지막 시도가 아니면 재시도를 위해 failed 전이 후 계속
+        if attempt_idx < max_attempts:
+            update_status(
+                case_dir,
+                StatusType.FAILED,
+                error_message=(
+                    f"exit_code={result.exit_code}, "
+                    f"시도 {current_attempt}/{max_attempts} 실패, 재시도 예정"
+                ),
+            )
+            logger.warning(
+                "재시도 예정: case=%s, attempt=%d/%d",
+                case_dir.name,
+                attempt_idx,
+                max_attempts,
+            )
+
+    # 모든 시도 실패
+    assert result is not None  # noqa: S101
+    update_status(
+        case_dir,
+        StatusType.FAILED,
+        error_message=(
+            f"exit_code={result.exit_code}, "
+            f"총 {max_attempts}회 시도 후 최종 실패"
+        ),
+    )
     return result

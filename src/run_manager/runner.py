@@ -64,6 +64,7 @@ def run_openmc(
     case_path: Path,
     *,
     openmc_command: str = OPENMC_COMMAND,
+    attempt: int | None = None,
 ) -> RunResult:
     """OpenMC를 서브프로세스로 실행한다.
 
@@ -74,13 +75,15 @@ def run_openmc(
         run_config: 실행 설정 (환경변수, 타임아웃 등).
         case_path: 케이스 폴더 경로.
         openmc_command: OpenMC 실행 명령어.
+        attempt: 시도 번호. 지정하면 run_{attempt}.log로 저장.
 
     Returns:
         RunResult 실행 결과.
     """
     output_dir = case_path / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    log_path = output_dir / "run.log"
+    log_filename = f"run_{attempt}.log" if attempt is not None else "run.log"
+    log_path = output_dir / log_filename
 
     # 작업 디렉토리: working_dir이 지정되면 사용, 아니면 case_path
     cwd = run_config.working_dir or case_path
