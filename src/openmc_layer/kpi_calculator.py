@@ -52,7 +52,9 @@ def calculate_keff_kpi(
     }
 
 
-def calculate_peaking_factor(result: SimulationResult) -> dict[str, float | None]:
+def calculate_peaking_factor(
+    result: SimulationResult,
+) -> dict[str, float | str | None]:
     """탈리 데이터에서 peaking factor를 계산한다.
 
     power/fission 관련 탈리의 mean 값에서
@@ -138,7 +140,7 @@ def calculate_kpi(
     return kpi
 
 
-def save_kpi(kpi: dict, case_path: Path) -> Path:
+def save_kpi(kpi: dict[str, float | str | None], case_path: Path) -> Path:
     """KPI를 JSON 파일로 저장한다.
 
     case_path/meta/kpi.json에 저장한다.
@@ -163,7 +165,7 @@ def save_kpi(kpi: dict, case_path: Path) -> Path:
     return kpi_path
 
 
-def load_kpi(case_path: Path) -> dict:
+def load_kpi(case_path: Path) -> dict[str, float | str | None]:
     """저장된 KPI를 읽어온다.
 
     Args:
@@ -180,4 +182,7 @@ def load_kpi(case_path: Path) -> dict:
     if not kpi_path.exists():
         raise FileNotFoundError(f"KPI 파일을 찾을 수 없습니다: {kpi_path}")
 
-    return json.loads(kpi_path.read_text(encoding="utf-8"))
+    data: dict[str, float | str | None] = json.loads(
+        kpi_path.read_text(encoding="utf-8"),
+    )
+    return data

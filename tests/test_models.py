@@ -4,7 +4,7 @@
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -36,8 +36,10 @@ class TestGeometryParams:
 
     def test_custom_values(self) -> None:
         geo = GeometryParams(
-            fuel_radius=0.35, clad_inner_radius=0.38,
-            clad_outer_radius=0.42, pitch=1.5,
+            fuel_radius=0.35,
+            clad_inner_radius=0.38,
+            clad_outer_radius=0.42,
+            pitch=1.5,
         )
         assert geo.fuel_radius == 0.35
         assert geo.pitch == 1.5
@@ -53,8 +55,10 @@ class TestGeometryParams:
     def test_clad_exceeds_half_pitch(self) -> None:
         with pytest.raises(ValidationError, match="pitch/2보다 작아야"):
             GeometryParams(
-                fuel_radius=0.3, clad_inner_radius=0.4,
-                clad_outer_radius=0.65, pitch=1.2,
+                fuel_radius=0.3,
+                clad_inner_radius=0.4,
+                clad_outer_radius=0.65,
+                pitch=1.2,
             )
 
     def test_negative_radius_rejected(self) -> None:
@@ -135,8 +139,10 @@ class TestCaseConfig:
         config = CaseConfig(
             name="test-case",
             geometry=GeometryParams(
-                fuel_radius=0.35, clad_inner_radius=0.38,
-                clad_outer_radius=0.42, pitch=1.2,
+                fuel_radius=0.35,
+                clad_inner_radius=0.38,
+                clad_outer_radius=0.42,
+                pitch=1.2,
             ),
             materials=MaterialParams(fuel_enrichment=4.5),
             settings=SimulationSettings(batches=200, particles=5000),
@@ -167,9 +173,7 @@ class TestRunConfig:
             max_retries=2,
         )
         assert rc.omp_threads == 8
-        assert rc.cross_sections_path == Path(
-            "/data/nucdata/cross_sections.xml"
-        )
+        assert rc.cross_sections_path == Path("/data/nucdata/cross_sections.xml")
         assert rc.max_retries == 2
 
     def test_json_roundtrip(self) -> None:
@@ -252,9 +256,7 @@ class TestTallyResult:
             )
 
     def test_frozen(self) -> None:
-        tally = TallyResult(
-            name="flux", scores=["flux"], mean=[1.0], std_dev=[0.1]
-        )
+        tally = TallyResult(name="flux", scores=["flux"], mean=[1.0], std_dev=[0.1])
         with pytest.raises(ValidationError):
             tally.name = "changed"
 
@@ -353,9 +355,7 @@ class TestReactorState:
     def test_json_roundtrip(self) -> None:
         state = ReactorState(
             current_config=CaseConfig(name="test"),
-            history=[
-                SimulationResult(keff=1.05, keff_std=0.001, runtime=60.0)
-            ],
+            history=[SimulationResult(keff=1.05, keff_std=0.001, runtime=60.0)],
             kpi={"keff": 1.05},
             iteration=1,
         )
@@ -407,7 +407,8 @@ class TestCrossModelIntegration:
         assert CaseConfig.model_validate(restored["config"]).name == "pwr-sweep-001"
         assert RunConfig.model_validate(restored["run_config"]).omp_threads == 4
         assert RunStatus.model_validate(restored["status"]).status == StatusType.DONE
-        assert SimulationResult.model_validate(restored["result"]).keff == pytest.approx(
-            1.06532
+        restored_result = SimulationResult.model_validate(
+            restored["result"],
         )
+        assert restored_result.keff == pytest.approx(1.06532)
         assert ReactorState.model_validate(restored["state"]).iteration == 1

@@ -6,8 +6,6 @@ CaseConfig → XML 변환 결과를 검증한다.
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import pytest
-
 from src.armi_layer.models import (
     CaseConfig,
     GeometryParams,
@@ -112,8 +110,10 @@ class TestBuildGeometryXml:
 
     def test_custom_geometry(self) -> None:
         geo = GeometryParams(
-            fuel_radius=0.35, clad_inner_radius=0.38,
-            clad_outer_radius=0.42, pitch=1.5,
+            fuel_radius=0.35,
+            clad_inner_radius=0.38,
+            clad_outer_radius=0.42,
+            pitch=1.5,
         )
         root = _build_geometry_xml(geo)
         fuel_surf = root.find(".//surface[@id='1']")

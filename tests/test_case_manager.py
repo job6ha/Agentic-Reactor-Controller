@@ -3,7 +3,6 @@
 CaseManager의 생성, 조회, 필터링 기능을 검증한다.
 """
 
-import json
 from pathlib import Path
 
 import h5py
@@ -14,11 +13,11 @@ from src.armi_layer.models import (
     CaseConfig,
     MaterialParams,
     RunStatus,
+    SimulationResult,
     SimulationSettings,
     StatusType,
 )
 from src.openmc_layer.kpi_calculator import calculate_kpi, save_kpi
-from src.armi_layer.models import SimulationResult
 
 
 def _set_case_status(case_dir: Path, status: StatusType) -> None:
@@ -26,7 +25,8 @@ def _set_case_status(case_dir: Path, status: StatusType) -> None:
     status_path = case_dir / "meta" / "status.json"
     run_status = RunStatus(status=status)
     status_path.write_text(
-        run_status.model_dump_json(indent=2), encoding="utf-8",
+        run_status.model_dump_json(indent=2),
+        encoding="utf-8",
     )
 
 
@@ -152,14 +152,16 @@ class TestCaseManagerGet:
         assert info.status.status == StatusType.QUEUED
 
     def test_get_result_none_when_no_statepoint(
-        self, manager: CaseManager,
+        self,
+        manager: CaseManager,
     ) -> None:
         case_id = manager.create(CaseConfig())
         info = manager.get(case_id)
         assert info.result is None
 
     def test_get_result_when_statepoint_exists(
-        self, manager: CaseManager,
+        self,
+        manager: CaseManager,
     ) -> None:
         case_id = manager.create(CaseConfig())
         case_dir = manager.runs_dir / case_id
@@ -170,7 +172,8 @@ class TestCaseManagerGet:
         assert abs(info.result.keff - 1.00234) < 1e-10
 
     def test_get_kpi_none_when_no_kpi_file(
-        self, manager: CaseManager,
+        self,
+        manager: CaseManager,
     ) -> None:
         case_id = manager.create(CaseConfig())
         info = manager.get(case_id)
@@ -182,7 +185,9 @@ class TestCaseManagerGet:
 
         # KPI 저장
         sim_result = SimulationResult(
-            keff=1.00234, keff_std=0.00056, runtime=45.3,
+            keff=1.00234,
+            keff_std=0.00056,
+            runtime=45.3,
         )
         kpi = calculate_kpi(sim_result)
         save_kpi(kpi, case_dir)

@@ -12,7 +12,12 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from xml.dom import minidom
 
-from src.armi_layer.models import CaseConfig, GeometryParams, MaterialParams, SimulationSettings
+from src.armi_layer.models import (
+    CaseConfig,
+    GeometryParams,
+    MaterialParams,
+    SimulationSettings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,32 +104,57 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
     half_pitch = geometry.pitch / 2.0
 
     ET.SubElement(
-        surfaces, "surface", id="1", type="z-cylinder",
+        surfaces,
+        "surface",
+        id="1",
+        type="z-cylinder",
         coeffs=f"0.0 0.0 {geometry.fuel_radius}",
     )
     ET.SubElement(
-        surfaces, "surface", id="2", type="z-cylinder",
+        surfaces,
+        "surface",
+        id="2",
+        type="z-cylinder",
         coeffs=f"0.0 0.0 {geometry.clad_inner_radius}",
     )
     ET.SubElement(
-        surfaces, "surface", id="3", type="z-cylinder",
+        surfaces,
+        "surface",
+        id="3",
+        type="z-cylinder",
         coeffs=f"0.0 0.0 {geometry.clad_outer_radius}",
     )
     ET.SubElement(
-        surfaces, "surface", id="4", type="x-plane",
-        coeffs=f"{-half_pitch}", boundary="reflective",
+        surfaces,
+        "surface",
+        id="4",
+        type="x-plane",
+        coeffs=f"{-half_pitch}",
+        boundary="reflective",
     )
     ET.SubElement(
-        surfaces, "surface", id="5", type="x-plane",
-        coeffs=f"{half_pitch}", boundary="reflective",
+        surfaces,
+        "surface",
+        id="5",
+        type="x-plane",
+        coeffs=f"{half_pitch}",
+        boundary="reflective",
     )
     ET.SubElement(
-        surfaces, "surface", id="6", type="y-plane",
-        coeffs=f"{-half_pitch}", boundary="reflective",
+        surfaces,
+        "surface",
+        id="6",
+        type="y-plane",
+        coeffs=f"{-half_pitch}",
+        boundary="reflective",
     )
     ET.SubElement(
-        surfaces, "surface", id="7", type="y-plane",
-        coeffs=f"{half_pitch}", boundary="reflective",
+        surfaces,
+        "surface",
+        id="7",
+        type="y-plane",
+        coeffs=f"{half_pitch}",
+        boundary="reflective",
     )
 
     # 셀 정의
@@ -132,23 +162,39 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
 
     # 연료 셀: surface 1 내부
     ET.SubElement(
-        cells, "cell", id="1", material="1",
-        region="-1", name="fuel",
+        cells,
+        "cell",
+        id="1",
+        material="1",
+        region="-1",
+        name="fuel",
     )
     # 갭 셀: surface 1~2 사이 (진공)
     ET.SubElement(
-        cells, "cell", id="2", material="void",
-        region="1 -2", name="gap",
+        cells,
+        "cell",
+        id="2",
+        material="void",
+        region="1 -2",
+        name="gap",
     )
     # 피복관 셀: surface 2~3 사이
     ET.SubElement(
-        cells, "cell", id="3", material="2",
-        region="2 -3", name="clad",
+        cells,
+        "cell",
+        id="3",
+        material="2",
+        region="2 -3",
+        name="clad",
     )
     # 냉각재 셀: surface 3 바깥, 사각 경계 내부
     ET.SubElement(
-        cells, "cell", id="4", material="3",
-        region="3 4 -5 6 -7", name="water",
+        cells,
+        "cell",
+        id="4",
+        material="3",
+        region="3 4 -5 6 -7",
+        name="water",
     )
 
     return root

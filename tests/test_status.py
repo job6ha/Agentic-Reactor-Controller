@@ -6,7 +6,7 @@ run_case 통합 함수를 테스트한다.
 
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -133,9 +133,7 @@ class TestUpdateStatus:
     def test_increment_attempt(self, tmp_path: Path) -> None:
         case_dir = _make_case_dir(tmp_path)
         _init_status(case_dir, RunStatus(attempt=2))
-        updated = update_status(
-            case_dir, StatusType.RUNNING, increment_attempt=True
-        )
+        updated = update_status(case_dir, StatusType.RUNNING, increment_attempt=True)
         assert updated.attempt == 3
 
     def test_persists_to_file(self, tmp_path: Path) -> None:
@@ -234,7 +232,10 @@ class TestRunCase:
             run_case(rc, case_dir, openmc_command="/custom/openmc")
 
         mock_run.assert_called_once_with(
-            rc, case_dir, openmc_command="/custom/openmc", attempt=1,
+            rc,
+            case_dir,
+            openmc_command="/custom/openmc",
+            attempt=1,
         )
 
 
@@ -249,12 +250,18 @@ class TestRunCaseRetry:
 
         with patch("src.run_manager.status.run_openmc") as mock_run:
             mock_run.side_effect = [
-                RunResult(exit_code=1, runtime=5.0,
-                          log_path=case_dir / "output" / "run_1.log",
-                          success=False),
-                RunResult(exit_code=0, runtime=10.0,
-                          log_path=case_dir / "output" / "run_2.log",
-                          success=True),
+                RunResult(
+                    exit_code=1,
+                    runtime=5.0,
+                    log_path=case_dir / "output" / "run_1.log",
+                    success=False,
+                ),
+                RunResult(
+                    exit_code=0,
+                    runtime=10.0,
+                    log_path=case_dir / "output" / "run_2.log",
+                    success=True,
+                ),
             ]
             result = run_case(rc, case_dir)
 
@@ -272,7 +279,8 @@ class TestRunCaseRetry:
 
         with patch("src.run_manager.status.run_openmc") as mock_run:
             mock_run.return_value = RunResult(
-                exit_code=1, runtime=3.0,
+                exit_code=1,
+                runtime=3.0,
                 log_path=case_dir / "output" / "run.log",
                 success=False,
             )
@@ -293,7 +301,8 @@ class TestRunCaseRetry:
 
         with patch("src.run_manager.status.run_openmc") as mock_run:
             mock_run.return_value = RunResult(
-                exit_code=1, runtime=2.0,
+                exit_code=1,
+                runtime=2.0,
                 log_path=case_dir / "output" / "run_1.log",
                 success=False,
             )
@@ -312,12 +321,18 @@ class TestRunCaseRetry:
 
         with patch("src.run_manager.status.run_openmc") as mock_run:
             mock_run.side_effect = [
-                RunResult(exit_code=1, runtime=1.0,
-                          log_path=case_dir / "output" / "run_1.log",
-                          success=False),
-                RunResult(exit_code=0, runtime=2.0,
-                          log_path=case_dir / "output" / "run_2.log",
-                          success=True),
+                RunResult(
+                    exit_code=1,
+                    runtime=1.0,
+                    log_path=case_dir / "output" / "run_1.log",
+                    success=False,
+                ),
+                RunResult(
+                    exit_code=0,
+                    runtime=2.0,
+                    log_path=case_dir / "output" / "run_2.log",
+                    success=True,
+                ),
             ]
             run_case(rc, case_dir)
 
@@ -333,12 +348,18 @@ class TestRunCaseRetry:
 
         with patch("src.run_manager.status.run_openmc") as mock_run:
             mock_run.side_effect = [
-                RunResult(exit_code=1, runtime=1.0,
-                          log_path=case_dir / "output" / "run_1.log",
-                          success=False),
-                RunResult(exit_code=0, runtime=2.0,
-                          log_path=case_dir / "output" / "run_2.log",
-                          success=True),
+                RunResult(
+                    exit_code=1,
+                    runtime=1.0,
+                    log_path=case_dir / "output" / "run_1.log",
+                    success=False,
+                ),
+                RunResult(
+                    exit_code=0,
+                    runtime=2.0,
+                    log_path=case_dir / "output" / "run_2.log",
+                    success=True,
+                ),
             ]
             result = run_case(rc, case_dir)
 

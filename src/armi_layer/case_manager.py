@@ -7,6 +7,7 @@ case_folder, status, result_parser, kpi_calculator 모듈을 조합하여
 
 from __future__ import annotations
 
+import builtins
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,7 +43,7 @@ class CaseInfo:
     config: CaseConfig
     status: RunStatus
     result: SimulationResult | None = field(default=None)
-    kpi: dict | None = field(default=None)
+    kpi: dict[str, float | str | None] | None = field(default=None)
 
 
 class CaseManager:
@@ -123,9 +124,7 @@ class CaseManager:
         case_dir = self._runs_dir / case_id
 
         if not case_dir.is_dir():
-            raise FileNotFoundError(
-                f"케이스를 찾을 수 없습니다: {case_id}"
-            )
+            raise FileNotFoundError(f"케이스를 찾을 수 없습니다: {case_id}")
 
         config = load_case_config(case_dir)
         status = load_run_status(case_dir)
@@ -145,7 +144,7 @@ class CaseManager:
             kpi=kpi,
         )
 
-    def get_by_status(self, status: StatusType) -> list[CaseInfo]:
+    def get_by_status(self, status: StatusType) -> builtins.list[CaseInfo]:
         """특정 상태의 케이스 상세 목록을 반환한다.
 
         Args:
@@ -184,7 +183,7 @@ class CaseManager:
             return None
 
     @staticmethod
-    def _try_load_kpi(case_dir: Path) -> dict | None:
+    def _try_load_kpi(case_dir: Path) -> dict[str, float | str | None] | None:
         """KPI 로드를 시도한다. 실패 시 None."""
         try:
             return load_kpi(case_dir)

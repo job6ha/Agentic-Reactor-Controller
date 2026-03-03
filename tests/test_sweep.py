@@ -165,10 +165,7 @@ class TestGenerateSweepConfigs:
             ],
         )
         configs = generate_sweep_configs(sweep)
-        combos = [
-            (c.materials.fuel_enrichment, c.geometry.pitch)
-            for c in configs
-        ]
+        combos = [(c.materials.fuel_enrichment, c.geometry.pitch) for c in configs]
         assert (2.0, 1.2) in combos
         assert (2.0, 1.4) in combos
         assert (4.0, 1.2) in combos

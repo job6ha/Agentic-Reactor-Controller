@@ -45,10 +45,12 @@ def manager(tmp_path: Path) -> CaseManager:
     mgr = CaseManager(runs_dir)
 
     # case_0001: done + statepoint + kpi
-    c1 = mgr.create(CaseConfig(
-        name="enr_2.0",
-        materials=MaterialParams(fuel_enrichment=2.0),
-    ))
+    c1 = mgr.create(
+        CaseConfig(
+            name="enr_2.0",
+            materials=MaterialParams(fuel_enrichment=2.0),
+        )
+    )
     case_dir1 = runs_dir / c1
     update_status(case_dir1, StatusType.DONE)
     _create_mock_statepoint(case_dir1, keff=0.98)
@@ -58,10 +60,12 @@ def manager(tmp_path: Path) -> CaseManager:
     )
 
     # case_0002: done + statepoint + kpi
-    c2 = mgr.create(CaseConfig(
-        name="enr_4.5",
-        materials=MaterialParams(fuel_enrichment=4.5),
-    ))
+    c2 = mgr.create(
+        CaseConfig(
+            name="enr_4.5",
+            materials=MaterialParams(fuel_enrichment=4.5),
+        )
+    )
     case_dir2 = runs_dir / c2
     update_status(case_dir2, StatusType.DONE)
     _create_mock_statepoint(case_dir2, keff=1.05)
@@ -71,10 +75,12 @@ def manager(tmp_path: Path) -> CaseManager:
     )
 
     # case_0003: failed, no statepoint
-    c3 = mgr.create(CaseConfig(
-        name="enr_failed",
-        materials=MaterialParams(fuel_enrichment=5.0),
-    ))
+    c3 = mgr.create(
+        CaseConfig(
+            name="enr_failed",
+            materials=MaterialParams(fuel_enrichment=5.0),
+        )
+    )
     case_dir3 = runs_dir / c3
     update_status(case_dir3, StatusType.FAILED, error_message="timeout")
 
@@ -95,9 +101,15 @@ class TestCollectResults:
     def test_columns_present(self, manager: CaseManager) -> None:
         df = collect_results(manager)
         expected_cols = [
-            "case_id", "status", "name",
-            "fuel_enrichment", "pitch", "keff", "keff_std",
-            "criticality", "peaking_factor",
+            "case_id",
+            "status",
+            "name",
+            "fuel_enrichment",
+            "pitch",
+            "keff",
+            "keff_std",
+            "criticality",
+            "peaking_factor",
         ]
         for col in expected_cols:
             assert col in df.columns
@@ -167,7 +179,9 @@ class TestExportCsv:
         assert len(loaded) == len(df)
 
     def test_csv_columns_match(
-        self, manager: CaseManager, tmp_path: Path,
+        self,
+        manager: CaseManager,
+        tmp_path: Path,
     ) -> None:
         df = collect_results(manager)
         path = tmp_path / "results.csv"
@@ -176,7 +190,9 @@ class TestExportCsv:
         assert list(loaded.columns) == list(df.columns)
 
     def test_creates_parent_dirs(
-        self, manager: CaseManager, tmp_path: Path,
+        self,
+        manager: CaseManager,
+        tmp_path: Path,
     ) -> None:
         df = collect_results(manager)
         path = tmp_path / "sub" / "dir" / "results.csv"
@@ -201,7 +217,9 @@ class TestExportJson:
         assert len(data) == len(df)
 
     def test_json_contains_case_ids(
-        self, manager: CaseManager, tmp_path: Path,
+        self,
+        manager: CaseManager,
+        tmp_path: Path,
     ) -> None:
         df = collect_results(manager)
         path = tmp_path / "results.json"

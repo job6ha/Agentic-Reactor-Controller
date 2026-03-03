@@ -101,7 +101,9 @@ class TestCalculateKeffKpi:
     def test_custom_margin(self) -> None:
         """마진 조정 시 판정이 변경됨."""
         result = SimulationResult(
-            keff=1.08, keff_std=0.001, runtime=10.0,
+            keff=1.08,
+            keff_std=0.001,
+            runtime=10.0,
         )
         # 기본 마진(0.05)에서는 supercritical
         kpi_default = calculate_keff_kpi(result)
@@ -114,7 +116,9 @@ class TestCalculateKeffKpi:
     def test_within_boundary(self) -> None:
         """마진 내 값은 critical로 판정."""
         result = SimulationResult(
-            keff=1.049, keff_std=0.001, runtime=10.0,
+            keff=1.049,
+            keff_std=0.001,
+            runtime=10.0,
         )
         kpi = calculate_keff_kpi(result, margin=0.05)
         assert kpi["criticality"] == "critical"
@@ -122,7 +126,9 @@ class TestCalculateKeffKpi:
     def test_outside_boundary(self) -> None:
         """마진을 초과하면 supercritical."""
         result = SimulationResult(
-            keff=1.06, keff_std=0.001, runtime=10.0,
+            keff=1.06,
+            keff_std=0.001,
+            runtime=10.0,
         )
         kpi = calculate_keff_kpi(result, margin=0.05)
         assert kpi["criticality"] == "supercritical"
@@ -132,7 +138,8 @@ class TestCalculatePeakingFactor:
     """calculate_peaking_factor 함수 테스트."""
 
     def test_peaking_from_fission_tally(
-        self, critical_result: SimulationResult,
+        self,
+        critical_result: SimulationResult,
     ) -> None:
         kpi = calculate_peaking_factor(critical_result)
         assert kpi["peaking_factor"] is not None
@@ -143,7 +150,9 @@ class TestCalculatePeakingFactor:
     def test_peaking_value(self) -> None:
         """peaking factor = max / avg 검증."""
         result = SimulationResult(
-            keff=1.0, keff_std=0.001, runtime=10.0,
+            keff=1.0,
+            keff_std=0.001,
+            runtime=10.0,
             tallies=[
                 TallyResult(
                     name="power",
@@ -160,7 +169,9 @@ class TestCalculatePeakingFactor:
     def test_uniform_distribution(self) -> None:
         """균일 분포 시 peaking factor = 1.0."""
         result = SimulationResult(
-            keff=1.0, keff_std=0.001, runtime=10.0,
+            keff=1.0,
+            keff_std=0.001,
+            runtime=10.0,
             tallies=[
                 TallyResult(
                     name="power",
@@ -181,7 +192,9 @@ class TestCalculatePeakingFactor:
     def test_flux_tally_used_when_no_fission(self) -> None:
         """fission 탈리가 없으면 flux 탈리 사용."""
         result = SimulationResult(
-            keff=1.0, keff_std=0.001, runtime=10.0,
+            keff=1.0,
+            keff_std=0.001,
+            runtime=10.0,
             tallies=[
                 TallyResult(
                     name="flux_only",
@@ -199,7 +212,9 @@ class TestCalculatePeakingFactor:
     def test_irrelevant_tally_ignored(self) -> None:
         """관련 없는 스코어만 있으면 peaking factor 없음."""
         result = SimulationResult(
-            keff=1.0, keff_std=0.001, runtime=10.0,
+            keff=1.0,
+            keff_std=0.001,
+            runtime=10.0,
             tallies=[
                 TallyResult(
                     name="other",
@@ -233,13 +248,16 @@ class TestCalculateKpi:
 
     def test_custom_margin_passed(self) -> None:
         result = SimulationResult(
-            keff=1.08, keff_std=0.001, runtime=10.0,
+            keff=1.08,
+            keff_std=0.001,
+            runtime=10.0,
         )
         kpi = calculate_kpi(result, keff_margin=0.1)
         assert kpi["criticality"] == "critical"
 
     def test_no_tallies_still_works(
-        self, no_tally_result: SimulationResult,
+        self,
+        no_tally_result: SimulationResult,
     ) -> None:
         kpi = calculate_kpi(no_tally_result)
         assert kpi["peaking_factor"] is None
@@ -250,7 +268,9 @@ class TestSaveAndLoadKpi:
     """save_kpi / load_kpi 테스트."""
 
     def test_save_creates_file(
-        self, tmp_path: Path, critical_result: SimulationResult,
+        self,
+        tmp_path: Path,
+        critical_result: SimulationResult,
     ) -> None:
         case_dir = tmp_path / "case_0001"
         case_dir.mkdir()
@@ -260,7 +280,9 @@ class TestSaveAndLoadKpi:
         assert kpi_path.name == "kpi.json"
 
     def test_save_creates_meta_dir(
-        self, tmp_path: Path, critical_result: SimulationResult,
+        self,
+        tmp_path: Path,
+        critical_result: SimulationResult,
     ) -> None:
         case_dir = tmp_path / "case_0001"
         case_dir.mkdir()
@@ -269,7 +291,9 @@ class TestSaveAndLoadKpi:
         assert (case_dir / "meta").is_dir()
 
     def test_saved_content_is_valid_json(
-        self, tmp_path: Path, critical_result: SimulationResult,
+        self,
+        tmp_path: Path,
+        critical_result: SimulationResult,
     ) -> None:
         case_dir = tmp_path / "case_0001"
         case_dir.mkdir()
@@ -279,7 +303,9 @@ class TestSaveAndLoadKpi:
         assert loaded["keff"] == kpi["keff"]
 
     def test_roundtrip(
-        self, tmp_path: Path, critical_result: SimulationResult,
+        self,
+        tmp_path: Path,
+        critical_result: SimulationResult,
     ) -> None:
         case_dir = tmp_path / "case_0001"
         case_dir.mkdir()
@@ -295,7 +321,9 @@ class TestSaveAndLoadKpi:
             load_kpi(case_dir)
 
     def test_overwrite_existing(
-        self, tmp_path: Path, critical_result: SimulationResult,
+        self,
+        tmp_path: Path,
+        critical_result: SimulationResult,
     ) -> None:
         case_dir = tmp_path / "case_0001"
         case_dir.mkdir()
@@ -303,7 +331,10 @@ class TestSaveAndLoadKpi:
         save_kpi(kpi1, case_dir)
 
         new_result = SimulationResult(
-            keff=0.95, keff_std=0.002, runtime=80.0, batches_completed=200,
+            keff=0.95,
+            keff_std=0.002,
+            runtime=80.0,
+            batches_completed=200,
         )
         kpi2 = calculate_kpi(new_result)
         save_kpi(kpi2, case_dir)

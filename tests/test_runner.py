@@ -3,7 +3,6 @@
 실제 OpenMC 없이 subprocess를 mock하여 테스트한다.
 """
 
-import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -90,9 +89,7 @@ class TestRunOpenmc:
         import subprocess
 
         with patch("src.run_manager.runner.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.TimeoutExpired(
-                cmd="openmc", timeout=1.0
-            )
+            mock_run.side_effect = subprocess.TimeoutExpired(cmd="openmc", timeout=1.0)
             result = run_openmc(rc, case_dir)
 
         assert result.success is False
@@ -178,7 +175,6 @@ class TestRunOpenmc:
 
         call_args = mock_run.call_args
         assert call_args.args[0] == ["/usr/local/bin/openmc"]
-
 
     def test_attempt_based_log_filename(self, tmp_path: Path) -> None:
         """attempt 지정 시 run_{attempt}.log 파일명 사용."""

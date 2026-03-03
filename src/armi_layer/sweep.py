@@ -11,6 +11,7 @@ import itertools
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,17 +46,20 @@ class SweepConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     base_config: CaseConfig = Field(
-        default_factory=CaseConfig, description="기본 케이스 설정",
+        default_factory=CaseConfig,
+        description="기본 케이스 설정",
     )
     params: list[SweepParam] = Field(
-        min_length=1, description="스윕할 파라미터 목록",
+        min_length=1,
+        description="스윕할 파라미터 목록",
     )
     name_template: str = Field(
-        default="sweep", description="케이스 이름 접두사",
+        default="sweep",
+        description="케이스 이름 접두사",
     )
 
 
-def _set_nested_field(data: dict, field_path: str, value: float) -> None:
+def _set_nested_field(data: dict[str, Any], field_path: str, value: float) -> None:
     """중첩 딕셔너리에서 dot notation 경로로 값을 설정한다.
 
     Args:
@@ -131,7 +135,8 @@ def generate_sweep_configs(sweep_config: SweepConfig) -> list[CaseConfig]:
             _set_nested_field(data, field_path, value)
 
         data["name"] = _build_case_name(
-            sweep_config.name_template, combo_list,
+            sweep_config.name_template,
+            combo_list,
         )
 
         config = CaseConfig.model_validate(data)
@@ -146,9 +151,10 @@ def generate_sweep_configs(sweep_config: SweepConfig) -> list[CaseConfig]:
     return configs
 
 
-def _deep_copy_dict(data: dict) -> dict:
+def _deep_copy_dict(data: dict[str, Any]) -> dict[str, Any]:
     """딕셔너리를 깊은 복사한다 (JSON 직렬화 가능한 데이터만)."""
-    return json.loads(json.dumps(data))
+    result: dict[str, Any] = json.loads(json.dumps(data))
+    return result
 
 
 def save_sweep_config(sweep_config: SweepConfig, path: Path) -> Path:

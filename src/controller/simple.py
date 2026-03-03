@@ -8,6 +8,7 @@ keff 수렴 여부를 판정하는 베이스라인 컨트롤러.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -94,18 +95,22 @@ class SimpleController(BaseController):
         # 최대 반복 체크
         if state.iteration >= self._config.max_iterations:
             logger.info("최대 반복 도달: %d", state.iteration)
-            return [Action(
-                action_type=ActionType.STOP,
-                reason=f"최대 반복 {self._config.max_iterations}회 도달",
-            )]
+            return [
+                Action(
+                    action_type=ActionType.STOP,
+                    reason=f"최대 반복 {self._config.max_iterations}회 도달",
+                )
+            ]
 
         # 스윕 값 소진 체크
         if state.iteration >= len(self._config.sweep_values):
             logger.info("스윕 값 소진: %d개", len(self._config.sweep_values))
-            return [Action(
-                action_type=ActionType.STOP,
-                reason="스윕 값 목록 소진",
-            )]
+            return [
+                Action(
+                    action_type=ActionType.STOP,
+                    reason="스윕 값 목록 소진",
+                )
+            ]
 
         # keff 수렴 체크 (첫 반복이 아닌 경우)
         if state.kpi and "keff" in state.kpi:
@@ -114,21 +119,33 @@ class SimpleController(BaseController):
             if deviation <= self._config.keff_tolerance:
                 logger.info(
                     "keff 수렴: keff=%.5f, target=%.5f, tol=%.5f",
-                    keff, self._config.target_keff, self._config.keff_tolerance,
+                    keff,
+                    self._config.target_keff,
+                    self._config.keff_tolerance,
                 )
-                return [Action(
-                    action_type=ActionType.STOP,
-                    reason=f"keff 수렴 (|{keff:.5f} - {self._config.target_keff}| <= {self._config.keff_tolerance})",
-                )]
+                return [
+                    Action(
+                        action_type=ActionType.STOP,
+                        reason=(
+                            f"keff 수렴 (|{keff:.5f} - {self._config.target_keff}|"
+                            f" <= {self._config.keff_tolerance})"
+                        ),
+                    )
+                ]
 
         # 다음 스윕 값 제안
         next_value = self._config.sweep_values[state.iteration]
-        return [Action(
-            action_type=ActionType.MODIFY_PARAM,
-            field_path=self._config.sweep_field,
-            value=next_value,
-            reason=f"스윕 탐색 [{state.iteration + 1}/{len(self._config.sweep_values)}]",
-        )]
+        return [
+            Action(
+                action_type=ActionType.MODIFY_PARAM,
+                field_path=self._config.sweep_field,
+                value=next_value,
+                reason=(
+                    f"스윕 탐색 [{state.iteration + 1}"
+                    f"/{len(self._config.sweep_values)}]"
+                ),
+            )
+        ]
 
     def apply_actions_to_case(
         self,
@@ -203,7 +220,7 @@ class SimpleController(BaseController):
         )
 
 
-def _set_nested(data: dict, field_path: str, value: object) -> None:
+def _set_nested(data: dict[str, Any], field_path: str, value: object) -> None:
     """중첩 딕셔너리에서 dot notation 경로로 값을 설정한다."""
     keys = field_path.split(".")
     current = data
