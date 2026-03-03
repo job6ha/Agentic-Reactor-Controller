@@ -179,6 +179,33 @@ class TestRunOpenmc:
         assert call_args.args[0] == ["/usr/local/bin/openmc"]
 
 
+    def test_attempt_based_log_filename(self, tmp_path: Path) -> None:
+        """attempt 지정 시 run_{attempt}.log 파일명 사용."""
+        case_dir = tmp_path / "case_0001"
+        case_dir.mkdir()
+
+        rc = RunConfig()
+
+        with patch("src.run_manager.runner.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = run_openmc(rc, case_dir, attempt=3)
+
+        assert result.log_path == case_dir / "output" / "run_3.log"
+
+    def test_no_attempt_uses_default_log(self, tmp_path: Path) -> None:
+        """attempt 미지정 시 run.log 파일명 사용."""
+        case_dir = tmp_path / "case_0001"
+        case_dir.mkdir()
+
+        rc = RunConfig()
+
+        with patch("src.run_manager.runner.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = run_openmc(rc, case_dir)
+
+        assert result.log_path == case_dir / "output" / "run.log"
+
+
 class TestRunResult:
     """RunResult 데이터클래스 테스트."""
 

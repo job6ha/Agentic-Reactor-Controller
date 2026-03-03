@@ -166,7 +166,7 @@ class TestRunCase:
             mock_run.return_value = RunResult(
                 exit_code=0,
                 runtime=10.0,
-                log_path=case_dir / "output" / "run.log",
+                log_path=case_dir / "output" / "run_1.log",
                 success=True,
             )
             result = run_case(rc, case_dir)
@@ -188,7 +188,7 @@ class TestRunCase:
             mock_run.return_value = RunResult(
                 exit_code=1,
                 runtime=5.0,
-                log_path=case_dir / "output" / "run.log",
+                log_path=case_dir / "output" / "run_1.log",
                 success=False,
             )
             result = run_case(rc, case_dir)
@@ -196,7 +196,8 @@ class TestRunCase:
         assert result.success is False
         final = get_status(case_dir)
         assert final.status == StatusType.FAILED
-        assert final.error_message == "exit_code=1"
+        assert "exit_code=1" in final.error_message
+        assert "최종 실패" in final.error_message
 
     def test_attempt_increments_on_retry(self, tmp_path: Path) -> None:
         """재시도 시 attempt가 증가."""
@@ -208,7 +209,7 @@ class TestRunCase:
             mock_run.return_value = RunResult(
                 exit_code=0,
                 runtime=8.0,
-                log_path=case_dir / "output" / "run.log",
+                log_path=case_dir / "output" / "run_2.log",
                 success=True,
             )
             run_case(rc, case_dir)
@@ -227,11 +228,119 @@ class TestRunCase:
             mock_run.return_value = RunResult(
                 exit_code=0,
                 runtime=1.0,
-                log_path=case_dir / "output" / "run.log",
+                log_path=case_dir / "output" / "run_1.log",
                 success=True,
             )
             run_case(rc, case_dir, openmc_command="/custom/openmc")
 
         mock_run.assert_called_once_with(
-            rc, case_dir, openmc_command="/custom/openmc"
+            rc, case_dir, openmc_command="/custom/openmc", attempt=1,
         )
+
+
+class TestRunCaseRetry:
+    """run_case 재시도 로직 테스트."""
+
+    def test_retry_succeeds_on_second_attempt(self, tmp_path: Path) -> None:
+        """1회 실패 후 2회차에 성공."""
+        case_dir = _make_case_dir(tmp_path)
+        _init_status(case_dir)
+        rc = RunConfig(max_retries=1)
+
+        with patch("src.run_manager.status.run_openmc") as mock_run:
+            mock_run.side_effect = [
+                RunResult(exit_code=1, runtime=5.0,
+                          log_path=case_dir / "output" / "run_1.log",
+                          success=False),
+                RunResult(exit_code=0, runtime=10.0,
+                          log_path=case_dir / "output" / "run_2.log",
+                          success=True),
+            ]
+            result = run_case(rc, case_dir)
+
+        assert result.success is True
+        final = get_status(case_dir)
+        assert final.status == StatusType.DONE
+        assert final.attempt == 2
+        assert mock_run.call_count == 2
+
+    def test_retry_all_fail(self, tmp_path: Path) -> None:
+        """max_retries=2에서 3회 모두 실패."""
+        case_dir = _make_case_dir(tmp_path)
+        _init_status(case_dir)
+        rc = RunConfig(max_retries=2)
+
+        with patch("src.run_manager.status.run_openmc") as mock_run:
+            mock_run.return_value = RunResult(
+                exit_code=1, runtime=3.0,
+                log_path=case_dir / "output" / "run.log",
+                success=False,
+            )
+            result = run_case(rc, case_dir)
+
+        assert result.success is False
+        final = get_status(case_dir)
+        assert final.status == StatusType.FAILED
+        assert "총 3회 시도 후 최종 실패" in final.error_message
+        assert final.attempt == 3
+        assert mock_run.call_count == 3
+
+    def test_no_retry_when_max_retries_zero(self, tmp_path: Path) -> None:
+        """max_retries=0이면 재시도 없이 1회만 실행."""
+        case_dir = _make_case_dir(tmp_path)
+        _init_status(case_dir)
+        rc = RunConfig(max_retries=0)
+
+        with patch("src.run_manager.status.run_openmc") as mock_run:
+            mock_run.return_value = RunResult(
+                exit_code=1, runtime=2.0,
+                log_path=case_dir / "output" / "run_1.log",
+                success=False,
+            )
+            result = run_case(rc, case_dir)
+
+        assert result.success is False
+        assert mock_run.call_count == 1
+        final = get_status(case_dir)
+        assert final.attempt == 1
+
+    def test_retry_passes_attempt_number(self, tmp_path: Path) -> None:
+        """각 시도에 올바른 attempt 번호가 전달되는지 확인."""
+        case_dir = _make_case_dir(tmp_path)
+        _init_status(case_dir)
+        rc = RunConfig(max_retries=1)
+
+        with patch("src.run_manager.status.run_openmc") as mock_run:
+            mock_run.side_effect = [
+                RunResult(exit_code=1, runtime=1.0,
+                          log_path=case_dir / "output" / "run_1.log",
+                          success=False),
+                RunResult(exit_code=0, runtime=2.0,
+                          log_path=case_dir / "output" / "run_2.log",
+                          success=True),
+            ]
+            run_case(rc, case_dir)
+
+        calls = mock_run.call_args_list
+        assert calls[0].kwargs["attempt"] == 1
+        assert calls[1].kwargs["attempt"] == 2
+
+    def test_retry_log_files_separate(self, tmp_path: Path) -> None:
+        """각 시도의 로그 파일이 별도로 생성되는지 확인."""
+        case_dir = _make_case_dir(tmp_path)
+        _init_status(case_dir)
+        rc = RunConfig(max_retries=1)
+
+        with patch("src.run_manager.status.run_openmc") as mock_run:
+            mock_run.side_effect = [
+                RunResult(exit_code=1, runtime=1.0,
+                          log_path=case_dir / "output" / "run_1.log",
+                          success=False),
+                RunResult(exit_code=0, runtime=2.0,
+                          log_path=case_dir / "output" / "run_2.log",
+                          success=True),
+            ]
+            result = run_case(rc, case_dir)
+
+        # 최종 결과의 로그 경로가 두 번째 시도의 것
+        assert result.log_path == case_dir / "output" / "run_2.log"
