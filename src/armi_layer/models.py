@@ -6,13 +6,13 @@
 """
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class StatusType(str, Enum):
+class StatusType(StrEnum):
     """시뮬레이션 실행 상태."""
 
     QUEUED = "queued"
@@ -82,18 +82,12 @@ class MaterialParams(BaseModel):
     fuel_enrichment: float = Field(
         default=3.0, ge=0.0, le=100.0, description="U-235 농축도 (wt%)"
     )
-    fuel_density: float = Field(
-        default=10.29769, gt=0, description="연료 밀도 (g/cm3)"
-    )
+    fuel_density: float = Field(default=10.29769, gt=0, description="연료 밀도 (g/cm3)")
     coolant_temperature: float = Field(
         default=600.0, gt=0, description="냉각재 온도 (K)"
     )
-    coolant_density: float = Field(
-        default=0.7, gt=0, description="냉각재 밀도 (g/cm3)"
-    )
-    clad_density: float = Field(
-        default=6.55, gt=0, description="피복관 밀도 (g/cm3)"
-    )
+    coolant_density: float = Field(default=0.7, gt=0, description="냉각재 밀도 (g/cm3)")
+    clad_density: float = Field(default=6.55, gt=0, description="피복관 밀도 (g/cm3)")
     extra_params: dict[str, float] = Field(
         default_factory=dict, description="추가 재료 파라미터"
     )
@@ -186,9 +180,7 @@ class RunConfig(BaseModel):
         default=None, gt=0, description="실행 타임아웃 초 (None=무제한)"
     )
     max_retries: int = Field(default=0, ge=0, description="최대 재시도 횟수")
-    working_dir: Path | None = Field(
-        default=None, description="실행 작업 디렉토리"
-    )
+    working_dir: Path | None = Field(default=None, description="실행 작업 디렉토리")
 
 
 class RunStatus(BaseModel):
@@ -208,21 +200,13 @@ class RunStatus(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    status: StatusType = Field(
-        default=StatusType.QUEUED, description="현재 실행 상태"
-    )
+    status: StatusType = Field(default=StatusType.QUEUED, description="현재 실행 상태")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC), description="케이스 생성 시각 (UTC)"
     )
-    started_at: datetime | None = Field(
-        default=None, description="실행 시작 시각"
-    )
-    completed_at: datetime | None = Field(
-        default=None, description="실행 완료 시각"
-    )
-    error_message: str | None = Field(
-        default=None, description="실패 시 에러 메시지"
-    )
+    started_at: datetime | None = Field(default=None, description="실행 시작 시각")
+    completed_at: datetime | None = Field(default=None, description="실행 완료 시각")
+    error_message: str | None = Field(default=None, description="실패 시 에러 메시지")
     attempt: int = Field(default=0, ge=0, description="현재 시도 횟수")
 
 
@@ -250,7 +234,8 @@ class TallyResult(BaseModel):
         """mean과 std_dev 길이가 일치하는지 검증한다."""
         if len(self.mean) != len(self.std_dev):
             raise ValueError(
-                f"mean({len(self.mean)})과 std_dev({len(self.std_dev)}) 길이가 일치해야 합니다"
+                f"mean({len(self.mean)})과 std_dev({len(self.std_dev)})"
+                " 길이가 일치해야 합니다"
             )
         return self
 
@@ -304,7 +289,5 @@ class ReactorState(BaseModel):
     history: list[SimulationResult] = Field(
         default_factory=list, description="이전 시뮬레이션 결과 이력"
     )
-    kpi: dict[str, float] = Field(
-        default_factory=dict, description="핵심 성능 지표"
-    )
+    kpi: dict[str, float] = Field(default_factory=dict, description="핵심 성능 지표")
     iteration: int = Field(default=0, description="현재 반복 횟수")

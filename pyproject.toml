@@ -33,7 +33,21 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["h5py", "h5py.*"]
+ignore_missing_imports = true
+
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
+    "pandas-stubs>=3.0.0.260204",
     "pytest>=9.0.2",
+    "ruff>=0.15.4",
 ]

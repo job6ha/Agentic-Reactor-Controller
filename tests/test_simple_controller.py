@@ -338,14 +338,16 @@ class TestControllerLoop:
             # 2번째 반복에서 수렴하도록 설정
             keff = 1.005 if state.iteration == 1 else 0.9
             result = SimulationResult(
-                keff=keff, keff_std=0.001, runtime=30.0,
+                keff=keff,
+                keff_std=0.001,
+                runtime=30.0,
             )
             metrics = ctrl.evaluate_results(result)
             state = ctrl.update_state(state, metrics)
             state = state.model_copy(update={"current_config": new_config})
             iterations += 1
 
-        # iteration 0 실행 → iteration 1 실행(keff=1.005) → iteration 2에서 수렴 감지 → STOP
+        # iter 0 실행 → iter 1 실행(keff=1.005) → iter 2에서 수렴 감지 → STOP
         assert iterations == 2
 
     def test_max_iterations_stops(self) -> None:
@@ -365,7 +367,9 @@ class TestControllerLoop:
 
             new_config = ctrl.apply_actions_to_case(actions, state)
             result = SimulationResult(
-                keff=0.8, keff_std=0.001, runtime=30.0,
+                keff=0.8,
+                keff_std=0.001,
+                runtime=30.0,
             )
             metrics = ctrl.evaluate_results(result)
             state = ctrl.update_state(state, metrics)

@@ -78,9 +78,7 @@ def _extract_keff(h5file: h5py.File) -> tuple[float, float]:
         StatepointParseError: k_combined 데이터가 없을 때.
     """
     if "k_combined" not in h5file:
-        raise StatepointParseError(
-            "k_combined 데이터셋을 찾을 수 없습니다"
-        )
+        raise StatepointParseError("k_combined 데이터셋을 찾을 수 없습니다")
 
     k_combined = h5file["k_combined"][()]
     keff = float(k_combined[0])
@@ -202,9 +200,7 @@ def _parse_single_tally(
 
     mean = flat_sum / max(n_realizations, 1)
     if n_realizations > 1:
-        variance = np.abs(flat_sum_sq / n_realizations - mean**2) / (
-            n_realizations - 1
-        )
+        variance = np.abs(flat_sum_sq / n_realizations - mean**2) / (n_realizations - 1)
         std_dev = np.sqrt(variance)
     else:
         std_dev = np.zeros_like(mean)

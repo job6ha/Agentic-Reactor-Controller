@@ -13,14 +13,14 @@ BaseController ABC를 정의하여 에이전트 교체 가능한 설계를 제�
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.armi_layer.models import CaseConfig, ReactorState, SimulationResult
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     """Action 유형.
 
     Attributes:
@@ -50,10 +50,12 @@ class Action(BaseModel):
 
     action_type: ActionType = Field(description="액션 유형")
     field_path: str | None = Field(
-        default=None, description="변경할 파라미터 경로",
+        default=None,
+        description="변경할 파라미터 경로",
     )
     value: float | int | str | bool | None = Field(
-        default=None, description="변경할 값",
+        default=None,
+        description="변경할 값",
     )
     reason: str = Field(default="", description="액션의 이유/근거")
 

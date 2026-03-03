@@ -63,8 +63,12 @@ class TestCreateCase:
     def test_saves_config_json(self, tmp_path: Path) -> None:
         config = CaseConfig(
             name="pwr-test",
-            geometry=GeometryParams(fuel_radius=0.35, clad_inner_radius=0.38,
-                                    clad_outer_radius=0.42, pitch=1.2),
+            geometry=GeometryParams(
+                fuel_radius=0.35,
+                clad_inner_radius=0.38,
+                clad_outer_radius=0.42,
+                pitch=1.2,
+            ),
             materials=MaterialParams(fuel_enrichment=4.5),
         )
         case_dir = create_case(config, runs_dir=tmp_path)

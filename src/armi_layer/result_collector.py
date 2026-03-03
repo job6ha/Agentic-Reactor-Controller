@@ -21,7 +21,7 @@ INCLUDE_FAILED = "include"
 EXCLUDE_FAILED = "exclude"
 
 
-def _extract_row(info: CaseInfo) -> dict:
+def _extract_row(info: CaseInfo) -> dict[str, object]:
     """CaseInfo에서 DataFrame 한 행의 데이터를 추출한다.
 
     Args:
@@ -30,7 +30,7 @@ def _extract_row(info: CaseInfo) -> dict:
     Returns:
         파라미터 + 결과 + KPI 딕셔너리.
     """
-    row: dict = {
+    row: dict[str, object] = {
         "case_id": info.case_id,
         "status": info.status.status.value,
         "name": info.config.name,
@@ -88,7 +88,7 @@ def collect_results(
     if case_ids is None:
         case_ids = manager.list()
 
-    rows: list[dict] = []
+    rows: list[dict[str, object]] = []
 
     for case_id in case_ids:
         try:
@@ -97,10 +97,7 @@ def collect_results(
             logger.warning("케이스 로드 실패: %s", case_id)
             continue
 
-        if (
-            failed_mode == EXCLUDE_FAILED
-            and info.status.status == StatusType.FAILED
-        ):
+        if failed_mode == EXCLUDE_FAILED and info.status.status == StatusType.FAILED:
             continue
 
         rows.append(_extract_row(info))

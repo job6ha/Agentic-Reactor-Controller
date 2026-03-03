@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 import pytest
 
-from src.armi_layer.models import SimulationResult, TallyResult
+from src.armi_layer.models import SimulationResult
 from src.openmc_layer.result_parser import (
     StatepointNotFoundError,
     StatepointParseError,
@@ -57,7 +57,8 @@ def _create_mock_statepoint(
             t1.attrs["name"] = b"flux_tally"
             t1.attrs["n_realizations"] = 90
             t1.create_dataset(
-                "score_bins", data=[b"flux"],
+                "score_bins",
+                data=[b"flux"],
             )
             # results shape: (1 bin, 1 score, 3)
             # [internal, sum, sum_sq]
@@ -69,7 +70,8 @@ def _create_mock_statepoint(
             t2.attrs["name"] = b"fission_tally"
             t2.attrs["n_realizations"] = 90
             t2.create_dataset(
-                "score_bins", data=[b"fission", b"nu-fission"],
+                "score_bins",
+                data=[b"fission", b"nu-fission"],
             )
             # results shape: (1 bin, 2 scores, 3)
             results2 = np.array([[[0.0, 1.2e13, 1.6e26], [0.0, 2.9e13, 9.5e26]]])
@@ -163,7 +165,9 @@ class TestExtractKeff:
     def test_custom_keff_values(self, tmp_path: Path) -> None:
         sp_path = tmp_path / "statepoint.20.h5"
         _create_mock_statepoint(
-            sp_path, keff=1.12345, keff_std=0.00123,
+            sp_path,
+            keff=1.12345,
+            keff_std=0.00123,
         )
         with h5py.File(sp_path, "r") as f:
             keff, keff_std = _extract_keff(f)

@@ -85,7 +85,7 @@ def update_status(
     current = get_status(case_dir)
     now = datetime.now(UTC)
 
-    update_fields: dict = {
+    update_fields: dict[str, object] = {
         "status": new_state,
     }
 
@@ -187,8 +187,7 @@ def run_case(
         case_dir,
         StatusType.FAILED,
         error_message=(
-            f"exit_code={result.exit_code}, "
-            f"총 {max_attempts}회 시도 후 최종 실패"
+            f"exit_code={result.exit_code}, 총 {max_attempts}회 시도 후 최종 실패"
         ),
     )
     return result

@@ -222,7 +222,7 @@ class TestControllerLoop:
             if any(a.action_type == ActionType.STOP for a in actions):
                 break
 
-            config = ctrl.apply_actions_to_case(actions, state)
+            ctrl.apply_actions_to_case(actions, state)
             # 시뮬레이션 결과를 가정
             result = SimulationResult(
                 keff=1.0 + 0.01 * state.iteration,
