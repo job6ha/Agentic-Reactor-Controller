@@ -21,8 +21,9 @@ class TestBuildEnv:
         env = _build_env(rc)
         # 기존 환경변수 상속
         assert "PATH" in env
-        # omp_threads=None이면 오버라이드하지 않음
-        assert env.get("OMP_NUM_THREADS") == os.environ.get("OMP_NUM_THREADS")
+        # omp_threads=None이면 자동 감지값이 설정됨
+        assert "OMP_NUM_THREADS" in env
+        assert int(env["OMP_NUM_THREADS"]) > 0
 
     def test_omp_threads_override(self) -> None:
         rc = RunConfig(omp_threads=8)

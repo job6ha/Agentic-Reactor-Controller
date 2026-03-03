@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.armi_layer.models import RunConfig
+from src.run_manager.cpu_detect import detect_physical_cores
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ def _build_env(run_config: RunConfig) -> dict[str, str]:
 
     현재 프로세스 환경변수를 복사한 뒤, RunConfig의 설정값으로
     OMP_NUM_THREADS와 OPENMC_CROSS_SECTIONS를 오버라이드한다.
+    omp_threads가 None이면 자동 감지된 물리 코어 수를 사용한다.
 
     Args:
         run_config: 실행 설정.
@@ -52,6 +54,10 @@ def _build_env(run_config: RunConfig) -> dict[str, str]:
 
     if run_config.omp_threads is not None:
         env["OMP_NUM_THREADS"] = str(run_config.omp_threads)
+    else:
+        detected = detect_physical_cores()
+        env["OMP_NUM_THREADS"] = str(detected)
+        logger.info("OMP_NUM_THREADS 자동 감지: %d", detected)
 
     if run_config.cross_sections_path is not None:
         env["OPENMC_CROSS_SECTIONS"] = str(run_config.cross_sections_path)
