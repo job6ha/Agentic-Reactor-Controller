@@ -1,7 +1,7 @@
 [project]
 name = "agentic-reactor-controller"
 version = "0.1.0"
-description = ""
+description = "ARMI + OpenMC 기반 원자로 시뮬레이션 제어 시스템"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
