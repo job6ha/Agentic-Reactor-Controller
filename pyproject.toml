@@ -5,6 +5,7 @@ description = "ARMI + OpenMC 기반 원자로 시뮬레이션 제어 시스템"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "h5py>=3.15.1",
     "pydantic>=2.12.5",
 ]
 
