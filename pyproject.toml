@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "ARMI + OpenMC 기반 원자로 시뮬레이션 제어 시스템"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pydantic>=2.12.5",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -28,3 +30,8 @@ select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
