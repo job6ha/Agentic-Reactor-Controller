@@ -38,3 +38,7 @@ htmlcov/
 
 # ruff
 .ruff_cache/
+
+# Project-specific
+runs/
+nucdata/
