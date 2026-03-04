@@ -7,13 +7,11 @@ services:
     container_name: arc-openmc
     volumes:
       # 시뮬레이션 결과 호스트 공유
-      - ./runs:/work/runs
-      # 커스텀 핵데이터 (옵션 — 이미지 내장 NNDC가 기본)
-      # 사용 시 .env에서 OPENMC_CROSS_SECTIONS 오버라이드 필요
-      # - ./nucdata:/data/nucdata
+      - ./runs:/app/runs
+      # 다운로드한 핵데이터 마운트
+      - ./nucdata:/data/nucdata
     environment:
       - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
-      # 커스텀 핵데이터 사용 시 주석 해제
-      # - OPENMC_CROSS_SECTIONS=/data/nucdata/cross_sections.xml
+      - OPENMC_CROSS_SECTIONS=/data/nucdata/endfb-viii.0-hdf5/cross_sections.xml
     stdin_open: true
     tty: true

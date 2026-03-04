@@ -117,8 +117,8 @@ class TestRunOpenmc:
         assert env["OMP_NUM_THREADS"] == "16"
         assert env["OPENMC_CROSS_SECTIONS"] == "/data/cross_sections.xml"
 
-    def test_cwd_is_case_path(self, tmp_path: Path) -> None:
-        """기본 작업 디렉토리가 case_path."""
+    def test_cwd_is_output_dir(self, tmp_path: Path) -> None:
+        """기본 작업 디렉토리가 case_path/output (statepoint 출력 위치)."""
         case_dir = tmp_path / "case_0001"
         case_dir.mkdir()
 
@@ -129,7 +129,7 @@ class TestRunOpenmc:
             run_openmc(rc, case_dir)
 
         call_kwargs = mock_run.call_args
-        assert call_kwargs.kwargs["cwd"] == str(case_dir)
+        assert call_kwargs.kwargs["cwd"] == str(case_dir / "output")
 
     def test_custom_working_dir(self, tmp_path: Path) -> None:
         """working_dir 설정 시 그 디렉토리를 cwd로 사용."""
@@ -174,7 +174,7 @@ class TestRunOpenmc:
             run_openmc(rc, case_dir, openmc_command="/usr/local/bin/openmc")
 
         call_args = mock_run.call_args
-        assert call_args.args[0] == ["/usr/local/bin/openmc"]
+        assert call_args.args[0][0] == "/usr/local/bin/openmc"
 
     def test_attempt_based_log_filename(self, tmp_path: Path) -> None:
         """attempt 지정 시 run_{attempt}.log 파일명 사용."""

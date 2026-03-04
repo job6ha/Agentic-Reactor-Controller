@@ -226,7 +226,14 @@ def _extract_runtime(h5file: h5py.File) -> float:
         if key in h5file.attrs:
             return float(h5file.attrs[key])
         if key in h5file:
-            return float(h5file[key][()])
+            item = h5file[key]
+            # Group인 경우 (예: runtime/total)
+            if isinstance(item, h5py.Group):
+                if "total" in item:
+                    return float(item["total"][()])
+                continue
+            # Dataset인 경우
+            return float(item[()])
 
     return 0.0
 

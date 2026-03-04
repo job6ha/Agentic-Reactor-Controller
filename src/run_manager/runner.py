@@ -86,13 +86,15 @@ def run_openmc(
     Returns:
         RunResult 실행 결과.
     """
-    output_dir = case_path / "output"
+    output_dir = (case_path / "output").resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    input_dir = (case_path / "input").resolve()
     log_filename = f"run_{attempt}.log" if attempt is not None else "run.log"
     log_path = output_dir / log_filename
 
-    # 작업 디렉토리: working_dir이 지정되면 사용, 아니면 case_path
-    cwd = run_config.working_dir or case_path
+    # 작업 디렉토리: output/ (statepoint가 여기에 생성됨)
+    # OpenMC에 input/ 경로를 인자로 전달하여 XML을 읽도록 함
+    cwd = run_config.working_dir or output_dir
 
     env = _build_env(run_config)
 
@@ -108,7 +110,7 @@ def run_openmc(
     try:
         with log_path.open("w", encoding="utf-8") as log_file:
             result = subprocess.run(
-                [openmc_command],
+                [openmc_command, str(input_dir)],
                 cwd=str(cwd),
                 env=env,
                 stdout=log_file,

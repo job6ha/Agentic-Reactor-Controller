@@ -17,7 +17,7 @@ COPY configs/ ./configs/
 RUN uv sync
 
 # runs 디렉토리 생성
-RUN mkdir -p /work/runs
+RUN mkdir -p /app/runs
 
 # 기본 환경변수
 ENV OMP_NUM_THREADS=4
