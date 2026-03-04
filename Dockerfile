@@ -11,6 +11,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY pyproject.toml README.md uv.lock* ./
 COPY src/ ./src/
 COPY tests/ ./tests/
+COPY configs/ ./configs/
 
 # 의존성 설치
 RUN uv sync
@@ -22,4 +23,4 @@ RUN mkdir -p /work/runs
 ENV OMP_NUM_THREADS=4
 ENV PYTHONPATH=/app
 
-CMD ["bash"]
+CMD ["uv", "run", "python", "-m", "src", "--config", "configs/default.json"]
