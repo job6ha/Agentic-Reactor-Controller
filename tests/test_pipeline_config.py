@@ -38,15 +38,19 @@ class TestPipelineConfigValidation:
 
     def test_invalid_keff_tolerance(self) -> None:
         with pytest.raises(ValidationError):
-            PipelineConfig.model_validate({
-                "controller": {"keff_tolerance": -0.01},
-            })
+            PipelineConfig.model_validate(
+                {
+                    "controller": {"keff_tolerance": -0.01},
+                }
+            )
 
     def test_invalid_max_iterations(self) -> None:
         with pytest.raises(ValidationError):
-            PipelineConfig.model_validate({
-                "controller": {"max_iterations": 0},
-            })
+            PipelineConfig.model_validate(
+                {
+                    "controller": {"max_iterations": 0},
+                }
+            )
 
 
 class TestLoadConfig:

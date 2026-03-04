@@ -17,32 +17,36 @@ from src.run_manager.runner import RunResult
 @pytest.fixture()
 def pipeline_config() -> PipelineConfig:
     """테스트용 파이프라인 설정."""
-    return PipelineConfig.model_validate({
-        "controller": {
-            "sweep_values": [2.0, 3.0],
-            "target_keff": 1.0,
-            "keff_tolerance": 0.01,
-            "max_iterations": 5,
-        },
-        "run": {
-            "omp_threads": 1,
-            "timeout": 60,
-            "max_retries": 0,
-        },
-        "output": {
-            "export_csv": False,
-            "export_json": False,
-        },
-    })
+    return PipelineConfig.model_validate(
+        {
+            "controller": {
+                "sweep_values": [2.0, 3.0],
+                "target_keff": 1.0,
+                "keff_tolerance": 0.01,
+                "max_iterations": 5,
+            },
+            "run": {
+                "omp_threads": 1,
+                "timeout": 60,
+                "max_retries": 0,
+            },
+            "output": {
+                "export_csv": False,
+                "export_json": False,
+            },
+        }
+    )
 
 
 @pytest.fixture()
 def pipeline(pipeline_config: PipelineConfig, tmp_path: Path) -> SimulationPipeline:
     """tmp_path 기반 파이프라인."""
     config = pipeline_config.model_copy(
-        update={"output": pipeline_config.output.model_copy(
-            update={"runs_dir": tmp_path / "runs"},
-        )},
+        update={
+            "output": pipeline_config.output.model_copy(
+                update={"runs_dir": tmp_path / "runs"},
+            )
+        },
     )
     return SimulationPipeline(config)
 
@@ -76,9 +80,14 @@ class TestSimulationPipelineInit:
 
     def test_from_config(self, tmp_path: Path) -> None:
         config_path = tmp_path / "config.json"
-        config_path.write_text(json.dumps({
-            "output": {"runs_dir": str(tmp_path / "runs")},
-        }), encoding="utf-8")
+        config_path.write_text(
+            json.dumps(
+                {
+                    "output": {"runs_dir": str(tmp_path / "runs")},
+                }
+            ),
+            encoding="utf-8",
+        )
 
         pipeline = SimulationPipeline.from_config(config_path)
         assert isinstance(pipeline, SimulationPipeline)
