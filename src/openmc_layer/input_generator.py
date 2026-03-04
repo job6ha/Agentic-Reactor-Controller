@@ -54,33 +54,30 @@ def _build_materials_xml(materials: MaterialParams) -> ET.Element:
     # 연료: UO2
     fuel = ET.SubElement(root, "material", id="1", name="UO2")
     ET.SubElement(fuel, "density", value=str(materials.fuel_density), units="g/cc")
-    fuel_nuclides = ET.SubElement(fuel, "nuclides")
     # U-235, U-238, O-16 조성 (wt% 기반 단순화)
     enrichment = materials.fuel_enrichment / 100.0
     u235_wo = enrichment * 238.0 / (238.0 + 2 * 16.0)  # UO2 내 U-235 질량분율 근사
     u238_wo = (1 - enrichment) * 238.0 / (238.0 + 2 * 16.0)
     o16_wo = 2 * 16.0 / (238.0 + 2 * 16.0)
 
-    ET.SubElement(fuel_nuclides, "nuclide", name="U235", wo=f"{u235_wo:.6f}")
-    ET.SubElement(fuel_nuclides, "nuclide", name="U238", wo=f"{u238_wo:.6f}")
-    ET.SubElement(fuel_nuclides, "nuclide", name="O16", wo=f"{o16_wo:.6f}")
+    ET.SubElement(fuel, "nuclide", name="U235", wo=f"{u235_wo:.6f}")
+    ET.SubElement(fuel, "nuclide", name="U238", wo=f"{u238_wo:.6f}")
+    ET.SubElement(fuel, "nuclide", name="O16", wo=f"{o16_wo:.6f}")
 
     # 피복관: Zircaloy-4
     clad = ET.SubElement(root, "material", id="2", name="Zircaloy-4")
     ET.SubElement(clad, "density", value=str(materials.clad_density), units="g/cc")
-    clad_nuclides = ET.SubElement(clad, "nuclides")
-    ET.SubElement(clad_nuclides, "nuclide", name="Zr90", wo="0.5145")
-    ET.SubElement(clad_nuclides, "nuclide", name="Zr91", wo="0.1122")
-    ET.SubElement(clad_nuclides, "nuclide", name="Zr92", wo="0.1715")
-    ET.SubElement(clad_nuclides, "nuclide", name="Zr94", wo="0.1738")
-    ET.SubElement(clad_nuclides, "nuclide", name="Zr96", wo="0.0280")
+    ET.SubElement(clad, "nuclide", name="Zr90", wo="0.5145")
+    ET.SubElement(clad, "nuclide", name="Zr91", wo="0.1122")
+    ET.SubElement(clad, "nuclide", name="Zr92", wo="0.1715")
+    ET.SubElement(clad, "nuclide", name="Zr94", wo="0.1738")
+    ET.SubElement(clad, "nuclide", name="Zr96", wo="0.0280")
 
     # 냉각재: H2O
     water = ET.SubElement(root, "material", id="3", name="H2O")
     ET.SubElement(water, "density", value=str(materials.coolant_density), units="g/cc")
-    water_nuclides = ET.SubElement(water, "nuclides")
-    ET.SubElement(water_nuclides, "nuclide", name="H1", wo="0.111894")
-    ET.SubElement(water_nuclides, "nuclide", name="O16", wo="0.888106")
+    ET.SubElement(water, "nuclide", name="H1", wo="0.111894")
+    ET.SubElement(water, "nuclide", name="O16", wo="0.888106")
     ET.SubElement(water, "sab", name="c_H_in_H2O")
 
     return root
@@ -100,32 +97,31 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
     root = ET.Element("geometry")
 
     # 표면 정의
-    surfaces = ET.SubElement(root, "surfaces")
     half_pitch = geometry.pitch / 2.0
 
     ET.SubElement(
-        surfaces,
+        root,
         "surface",
         id="1",
         type="z-cylinder",
         coeffs=f"0.0 0.0 {geometry.fuel_radius}",
     )
     ET.SubElement(
-        surfaces,
+        root,
         "surface",
         id="2",
         type="z-cylinder",
         coeffs=f"0.0 0.0 {geometry.clad_inner_radius}",
     )
     ET.SubElement(
-        surfaces,
+        root,
         "surface",
         id="3",
         type="z-cylinder",
         coeffs=f"0.0 0.0 {geometry.clad_outer_radius}",
     )
     ET.SubElement(
-        surfaces,
+        root,
         "surface",
         id="4",
         type="x-plane",
@@ -133,7 +129,7 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
         boundary="reflective",
     )
     ET.SubElement(
-        surfaces,
+        root,
         "surface",
         id="5",
         type="x-plane",
@@ -141,7 +137,7 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
         boundary="reflective",
     )
     ET.SubElement(
-        surfaces,
+        root,
         "surface",
         id="6",
         type="y-plane",
@@ -149,7 +145,7 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
         boundary="reflective",
     )
     ET.SubElement(
-        surfaces,
+        root,
         "surface",
         id="7",
         type="y-plane",
@@ -158,11 +154,10 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
     )
 
     # 셀 정의
-    cells = ET.SubElement(root, "cells")
 
     # 연료 셀: surface 1 내부
     ET.SubElement(
-        cells,
+        root,
         "cell",
         id="1",
         material="1",
@@ -171,7 +166,7 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
     )
     # 갭 셀: surface 1~2 사이 (진공)
     ET.SubElement(
-        cells,
+        root,
         "cell",
         id="2",
         material="void",
@@ -180,7 +175,7 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
     )
     # 피복관 셀: surface 2~3 사이
     ET.SubElement(
-        cells,
+        root,
         "cell",
         id="3",
         material="2",
@@ -189,7 +184,7 @@ def _build_geometry_xml(geometry: GeometryParams) -> ET.Element:
     )
     # 냉각재 셀: surface 3 바깥, 사각 경계 내부
     ET.SubElement(
-        cells,
+        root,
         "cell",
         id="4",
         material="3",
