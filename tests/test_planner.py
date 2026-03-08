@@ -16,6 +16,26 @@ def planner() -> LLMPlanner:
     return LLMPlanner(base_url="http://localhost:8001/v1", model="qwen3.5")
 
 
+class TestPlannerInit:
+    """LLMPlanner 초기화 테스트."""
+
+    def test_valid_localhost(self) -> None:
+        planner = LLMPlanner(base_url="http://localhost:8001/v1", model="test")
+        assert planner._base_url == "http://localhost:8001/v1"
+
+    def test_rejects_external_host(self) -> None:
+        with pytest.raises(ValueError, match="허용되지 않는 LLM 호스트"):
+            LLMPlanner(base_url="http://evil.com/v1", model="test")
+
+    def test_rejects_metadata_endpoint(self) -> None:
+        with pytest.raises(ValueError, match="허용되지 않는 LLM 호스트"):
+            LLMPlanner(base_url="http://169.254.169.254/latest", model="test")
+
+    def test_rejects_ftp_scheme(self) -> None:
+        with pytest.raises(ValueError, match="허용되지 않는 URL 스킴"):
+            LLMPlanner(base_url="ftp://localhost:8001/v1", model="test")
+
+
 class TestParseResponse:
     """_parse_response 테스트."""
 

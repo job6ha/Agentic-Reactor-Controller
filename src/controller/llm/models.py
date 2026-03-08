@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.controller.base import Action, ActionType
 
@@ -77,10 +77,35 @@ class LLMControllerConfig(BaseModel):
         gt=0,
         description="최대 반복 횟수 (= depletion step 수)",
     )
+    max_single_movement: int = Field(
+        default=50,
+        gt=0,
+        description="단일 스텝 최대 이동량 (안전 제한)",
+    )
     log_dir: Path = Field(
         default=Path("runs/llm_logs"),
         description="로그 저장 디렉토리",
     )
+
+    @model_validator(mode="after")
+    def validate_rod_position_range(self) -> LLMControllerConfig:
+        """제어봉 위치 범위와 초기 위치의 유효성을 검증한다."""
+        if self.rod_position_min >= self.rod_position_max:
+            raise ValueError(
+                f"rod_position_min({self.rod_position_min})은 "
+                f"rod_position_max({self.rod_position_max})보다 작아야 합니다"
+            )
+        in_range = (
+            self.rod_position_min
+            <= self.initial_rod_position
+            <= self.rod_position_max
+        )
+        if not in_range:
+            raise ValueError(
+                f"initial_rod_position({self.initial_rod_position})은 "
+                f"[{self.rod_position_min}, {self.rod_position_max}] 범위여야 합니다"
+            )
+        return self
 
 
 class ScoredCandidate(BaseModel):

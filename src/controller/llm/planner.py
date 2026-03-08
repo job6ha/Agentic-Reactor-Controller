@@ -11,6 +11,7 @@ import json
 import logging
 import random
 import re
+import urllib.parse
 
 import httpx
 
@@ -23,6 +24,10 @@ LLM_TIMEOUT = 30.0
 
 # 폴백 후보 생성 범위
 FALLBACK_MOVEMENT_RANGE = (-20, 20)
+
+# SSRF 방지: 허용된 LLM 서버 호스트
+ALLOWED_LLM_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
 SYSTEM_PROMPT = """\
 당신은 원자로 제어봉 조작 전문가입니다.
@@ -50,6 +55,14 @@ class LLMPlanner:
     """
 
     def __init__(self, base_url: str, model: str) -> None:
+        parsed = urllib.parse.urlparse(base_url)
+        if parsed.scheme not in ALLOWED_URL_SCHEMES:
+            raise ValueError(f"허용되지 않는 URL 스킴: {parsed.scheme}")
+        if parsed.hostname not in ALLOWED_LLM_HOSTS:
+            raise ValueError(
+                f"허용되지 않는 LLM 호스트: {parsed.hostname}. "
+                f"허용 목록: {ALLOWED_LLM_HOSTS}"
+            )
         self._base_url = base_url.rstrip("/")
         self._model = model
 
@@ -58,15 +71,18 @@ class LLMPlanner:
         state: ReactorState,
         current_rod_position: int,
         n: int = 10,
+        max_movement: int = 50,
     ) -> list[int]:
         """LLM을 호출하여 제어봉 이동값 후보를 생성한다.
 
         LLM 호출 실패 시 랜덤 폴백 후보를 반환한다.
+        모든 후보는 ``max_movement`` 범위로 클램핑된다.
 
         Args:
             state: 현재 원자로 상태.
             current_rod_position: 현재 제어봉 위치.
             n: 생성할 후보 수.
+            max_movement: 단일 스텝 최대 이동량.
 
         Returns:
             정수 이동값 리스트.
@@ -76,11 +92,14 @@ class LLMPlanner:
         try:
             response_text = self._call_llm(user_prompt)
             movements = self._parse_response(response_text, n)
-            logger.info("LLM 후보 생성 성공: %s", movements)
-            return movements
         except Exception:
             logger.warning("LLM 호출/파싱 실패, 폴백 후보 사용", exc_info=True)
-            return self._fallback_candidates(n)
+            movements = self._fallback_candidates(n)
+
+        # 안전 제한: 이동량 클램핑
+        movements = [max(-max_movement, min(max_movement, m)) for m in movements]
+        logger.info("LLM 후보 생성: %s", movements)
+        return movements
 
     def _build_user_prompt(
         self,

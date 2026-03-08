@@ -56,6 +56,21 @@ class TestLLMControllerConfig:
         with pytest.raises(ValidationError):
             LLMControllerConfig(controller_type="simple")
 
+    def test_rod_position_min_must_be_less_than_max(self) -> None:
+        with pytest.raises(ValidationError, match="rod_position_min"):
+            LLMControllerConfig(rod_position_min=300, rod_position_max=100)
+
+    def test_initial_rod_position_must_be_in_range(self) -> None:
+        with pytest.raises(ValidationError, match="initial_rod_position"):
+            LLMControllerConfig(
+                initial_rod_position=500,
+                rod_position_max=228,
+            )
+
+    def test_rod_position_min_equals_max_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            LLMControllerConfig(rod_position_min=100, rod_position_max=100)
+
 
 class TestScoredCandidate:
     """ScoredCandidate 모델 테스트."""

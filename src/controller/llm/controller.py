@@ -8,7 +8,6 @@ GP 기반 BO가 안전 점수를 부여하여 최적 후보를 선택한다.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from src.armi_layer.models import CaseConfig, ReactorState, SimulationResult
 from src.controller.base import Action, ActionType, BaseController
@@ -21,6 +20,7 @@ from src.controller.llm.models import (
 )
 from src.controller.llm.optimizer import BayesianOptimizer
 from src.controller.llm.planner import LLMPlanner
+from src.controller.utils import set_nested
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,7 @@ class LLMController(BaseController):
             state,
             self._rod_position,
             n=self._config.n_candidates,
+            max_movement=self._config.max_single_movement,
         )
 
         # BO로 후보 점수 부여
@@ -161,7 +162,7 @@ class LLMController(BaseController):
 
         for action in actions:
             if action.action_type == ActionType.MODIFY_PARAM and action.field_path:
-                _set_nested(data, action.field_path, action.value)
+                set_nested(data, action.field_path, action.value)
 
         return CaseConfig.model_validate(data)
 
@@ -248,15 +249,4 @@ class LLMController(BaseController):
         )
 
 
-def _set_nested(data: dict[str, Any], field_path: str, value: object) -> None:
-    """중첩 딕셔너리에서 dot notation 경로로 값을 설정한다.
-
-    중간 키가 없으면 빈 딕셔너리를 생성한다.
-    """
-    keys = field_path.split(".")
-    current = data
-    for key in keys[:-1]:
-        if key not in current:
-            current[key] = {}
-        current = current[key]
-    current[keys[-1]] = value
+__all__ = ["LLMController"]
