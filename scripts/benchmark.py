@@ -4,6 +4,9 @@
 Docker 컨테이너 내부에서 실행되며, 실제 OpenMC 시뮬레이션을 수행한다.
 LLM 서버는 호스트(localhost:8001)에서 실행 중이어야 한다.
 
+병렬 실행: LLM 서버의 동시 처리 능력을 활용하여 블루프린트를 병렬로 실행한다.
+N_WORKERS로 동시 실행 수를 조절한다.
+
 Usage (Docker):
     docker compose run --rm openmc uv run python scripts/benchmark.py
 
@@ -17,6 +20,7 @@ import json
 import logging
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -34,7 +38,7 @@ from src.armi_layer.models import (
 from src.armi_layer.case_folder import create_case
 from src.controller.factory import create_controller
 from src.controller.llm.models import LLMControllerConfig
-from src.controller.simple import SimpleControllerConfig
+from src.controller.pid import PIDControllerConfig, ProportionalControllerConfig
 from src.controller.base import ActionType
 from src.openmc_layer.input_generator import generate_input
 from src.openmc_layer.result_parser import parse_results
@@ -60,8 +64,9 @@ RUN_CONFIG = RunConfig(
     max_retries=1,
 )
 
-MAX_STEPS = 20  # 벤치마크용 최대 스텝 (현실적 제어봉 이동 반영)
+MAX_STEPS = 50  # 벤치마크용 최대 스텝 (아임계 시작 → 임계 수렴)
 RUNS_DIR = Path("runs/benchmark")
+N_WORKERS = 2  # 병렬 블루프린트 실행 수 (안정성 위해 감소, 4→2)
 
 
 @dataclass
@@ -123,7 +128,7 @@ def run_blueprint_llm(bp: dict, runs_dir: Path) -> BenchmarkResult:
 
     config = LLMControllerConfig(
         llm_base_url="http://host.docker.internal:8001/v1",
-        llm_model="mlx-community/Qwen3.5-9B-4bit",
+        llm_model="mlx-community/Qwen3.5-9B-bf16",
         n_candidates=10,
         initial_rod_position=bp.get("initial_rod_position", 228),
         max_iterations=MAX_STEPS,
@@ -202,18 +207,15 @@ def run_blueprint_llm(bp: dict, runs_dir: Path) -> BenchmarkResult:
     return result
 
 
-def run_blueprint_simple(bp: dict, runs_dir: Path) -> BenchmarkResult:
-    """SimpleController로 블루프린트를 실행한다 (비교 대조군)."""
+def _run_blueprint_rod_controller(
+    bp: dict,
+    runs_dir: Path,
+    controller_type: str,
+    config: PIDControllerConfig | ProportionalControllerConfig,
+) -> BenchmarkResult:
+    """PID 또는 P-only 제어봉 컨트롤러로 블루프린트를 실행한다."""
     name = bp["name"]
-    result = BenchmarkResult(blueprint_name=name, controller_type="simple")
-
-    # SimpleController는 파라미터 스윕 — fuel_enrichment 기준으로 비교
-    enrichment = bp.get("materials", {}).get("fuel_enrichment", 3.0)
-    config = SimpleControllerConfig(
-        sweep_field="materials.fuel_enrichment",
-        sweep_values=[enrichment - 0.3, enrichment - 0.1, enrichment, enrichment + 0.1, enrichment + 0.3],
-        max_iterations=min(5, MAX_STEPS),
-    )
+    result = BenchmarkResult(blueprint_name=name, controller_type=controller_type)
 
     controller = create_controller(config)
     case_config = build_case_config(bp)
@@ -226,13 +228,15 @@ def run_blueprint_simple(bp: dict, runs_dir: Path) -> BenchmarkResult:
             stop_actions = [a for a in actions if a.action_type == ActionType.STOP]
             if stop_actions:
                 result.stop_reason = stop_actions[0].reason
+                logger.info("[%s/%s] STOP at step %d: %s", name, controller_type, step, result.stop_reason)
                 break
 
             case_config = controller.apply_actions_to_case(actions, state)
 
-            sim_result = _run_openmc(case_config, runs_dir, f"simple_{name}_step{step}")
+            sim_result = _run_openmc(case_config, runs_dir, f"{controller_type}_{name}_step{step}")
             if sim_result is None:
                 result.error = f"OpenMC 실행 실패 at step {step}"
+                logger.error("[%s/%s] %s", name, controller_type, result.error)
                 break
 
             metrics = controller.evaluate_results(sim_result)
@@ -244,23 +248,22 @@ def run_blueprint_simple(bp: dict, runs_dir: Path) -> BenchmarkResult:
                 },
             )
 
-            keff = sim_result.keff
-            deviation = abs(keff - 1.0)
             sr = StepResult(
                 step=step,
-                rod_position=0.0,  # simple은 rod 미사용
-                keff=keff,
-                keff_std=sim_result.keff_std,
-                keff_deviation=deviation,
+                rod_position=metrics.get("rod_position", 0.0),
+                keff=metrics["keff"],
+                keff_std=metrics["keff_std"],
+                keff_deviation=metrics["keff_deviation"],
                 safety_score=0.0,
-                converged=deviation <= 0.01,
+                converged=metrics["converged"] > 0.5,
                 runtime=sim_result.runtime,
             )
             result.steps.append(sr)
 
             logger.info(
-                "[%s/simple] step=%d keff=%.5f±%.5f dev=%.5f",
-                name, step, keff, sim_result.keff_std, deviation,
+                "[%s/%s] step=%d rod=%d keff=%.5f±%.5f dev=%.5f",
+                name, controller_type, step, int(sr.rod_position),
+                sr.keff, sr.keff_std, sr.keff_deviation,
             )
 
             if sr.converged and result.converged_at_step < 0:
@@ -269,7 +272,7 @@ def run_blueprint_simple(bp: dict, runs_dir: Path) -> BenchmarkResult:
 
     except Exception as e:
         result.error = str(e)
-        logger.error("[%s/simple] 에러: %s", name, e, exc_info=True)
+        logger.error("[%s/%s] 에러: %s", name, controller_type, e, exc_info=True)
 
     result.total_runtime = time.time() - t_start
     if result.steps:
@@ -277,6 +280,28 @@ def run_blueprint_simple(bp: dict, runs_dir: Path) -> BenchmarkResult:
         result.final_deviation = result.steps[-1].keff_deviation
 
     return result
+
+
+def run_blueprint_pid(bp: dict, runs_dir: Path) -> BenchmarkResult:
+    """PID 컨트롤러로 블루프린트를 실행한다."""
+    config = PIDControllerConfig(
+        initial_rod_position=bp.get("initial_rod_position", 14),
+        max_iterations=MAX_STEPS,
+        keff_tolerance=0.05,
+        keff_critical_deviation=1.0,
+    )
+    return _run_blueprint_rod_controller(bp, runs_dir, "pid", config)
+
+
+def run_blueprint_proportional(bp: dict, runs_dir: Path) -> BenchmarkResult:
+    """P-only 컨트롤러로 블루프린트를 실행한다."""
+    config = ProportionalControllerConfig(
+        initial_rod_position=bp.get("initial_rod_position", 14),
+        max_iterations=MAX_STEPS,
+        keff_tolerance=0.05,
+        keff_critical_deviation=1.0,
+    )
+    return _run_blueprint_rod_controller(bp, runs_dir, "proportional", config)
 
 
 def _run_openmc(
@@ -302,7 +327,8 @@ def _run_openmc(
 
 def generate_report(
     llm_results: list[BenchmarkResult],
-    simple_results: list[BenchmarkResult],
+    pid_results: list[BenchmarkResult],
+    prop_results: list[BenchmarkResult],
     output_path: Path,
 ) -> None:
     """벤치마크 보고서를 JSON으로 저장한다."""
@@ -312,10 +338,12 @@ def generate_report(
             "sim_batches": BENCHMARK_SETTINGS.batches,
             "sim_particles": BENCHMARK_SETTINGS.particles,
             "n_blueprints": len(llm_results),
+            "controllers": ["llm", "pid", "proportional"],
         },
-        "summary": _build_summary(llm_results, simple_results),
+        "summary": _build_summary(llm_results, pid_results, prop_results),
         "llm_results": [_result_to_dict(r) for r in llm_results],
-        "simple_results": [_result_to_dict(r) for r in simple_results],
+        "pid_results": [_result_to_dict(r) for r in pid_results],
+        "proportional_results": [_result_to_dict(r) for r in prop_results],
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -326,38 +354,35 @@ def generate_report(
     logger.info("보고서 저장: %s", output_path)
 
 
-def _build_summary(
-    llm_results: list[BenchmarkResult],
-    simple_results: list[BenchmarkResult],
-) -> dict:
-    """요약 통계를 생성한다."""
-    llm_ok = [r for r in llm_results if not r.error]
-    simple_ok = [r for r in simple_results if not r.error]
+def _summarize_group(results: list[BenchmarkResult]) -> dict:
+    """단일 컨트롤러 그룹의 요약 통계."""
+    ok = [r for r in results if not r.error]
 
     def avg(vals: list[float]) -> float:
         return sum(vals) / len(vals) if vals else 0.0
 
     return {
-        "llm": {
-            "total_runs": len(llm_results),
-            "successful": len(llm_ok),
-            "converged": sum(1 for r in llm_ok if r.converged),
-            "avg_final_deviation": avg([r.final_deviation for r in llm_ok]),
-            "avg_runtime": avg([r.total_runtime for r in llm_ok]),
-            "avg_converge_step": avg(
-                [r.converged_at_step for r in llm_ok if r.converged]
-            ),
-        },
-        "simple": {
-            "total_runs": len(simple_results),
-            "successful": len(simple_ok),
-            "converged": sum(1 for r in simple_ok if r.converged),
-            "avg_final_deviation": avg([r.final_deviation for r in simple_ok]),
-            "avg_runtime": avg([r.total_runtime for r in simple_ok]),
-            "avg_converge_step": avg(
-                [r.converged_at_step for r in simple_ok if r.converged]
-            ),
-        },
+        "total_runs": len(results),
+        "successful": len(ok),
+        "converged": sum(1 for r in ok if r.converged),
+        "avg_final_deviation": avg([r.final_deviation for r in ok]),
+        "avg_runtime": avg([r.total_runtime for r in ok]),
+        "avg_converge_step": avg(
+            [r.converged_at_step for r in ok if r.converged]
+        ),
+    }
+
+
+def _build_summary(
+    llm_results: list[BenchmarkResult],
+    pid_results: list[BenchmarkResult],
+    prop_results: list[BenchmarkResult],
+) -> dict:
+    """요약 통계를 생성한다."""
+    return {
+        "llm": _summarize_group(llm_results),
+        "pid": _summarize_group(pid_results),
+        "proportional": _summarize_group(prop_results),
     }
 
 
@@ -389,6 +414,46 @@ def _result_to_dict(r: BenchmarkResult) -> dict:
     }
 
 
+def _run_one_blueprint(
+    idx: int,
+    total: int,
+    bp: dict,
+    runs_dir: Path,
+) -> tuple[BenchmarkResult, BenchmarkResult, BenchmarkResult]:
+    """단일 블루프린트를 LLM + PID + P-only 컨트롤러로 실행한다.
+
+    ThreadPoolExecutor에서 호출된다.
+    """
+    name = bp["name"]
+    logger.info(
+        "[%d/%d] 블루프린트 시작: %s — %s",
+        idx + 1, total, name, bp.get("description", ""),
+    )
+
+    llm_r = run_blueprint_llm(bp, runs_dir)
+    logger.info(
+        "[%s/llm] 완료: keff=%.5f dev=%.5f converged=%s time=%.1fs",
+        name, llm_r.final_keff, llm_r.final_deviation,
+        llm_r.converged, llm_r.total_runtime,
+    )
+
+    pid_r = run_blueprint_pid(bp, runs_dir)
+    logger.info(
+        "[%s/pid] 완료: keff=%.5f dev=%.5f converged=%s time=%.1fs",
+        name, pid_r.final_keff, pid_r.final_deviation,
+        pid_r.converged, pid_r.total_runtime,
+    )
+
+    prop_r = run_blueprint_proportional(bp, runs_dir)
+    logger.info(
+        "[%s/proportional] 완료: keff=%.5f dev=%.5f converged=%s time=%.1fs",
+        name, prop_r.final_keff, prop_r.final_deviation,
+        prop_r.converged, prop_r.total_runtime,
+    )
+
+    return llm_r, pid_r, prop_r
+
+
 def main() -> None:
     """벤치마크 메인 함수."""
     bp_path = Path("configs/blueprints.json")
@@ -397,58 +462,69 @@ def main() -> None:
         sys.exit(1)
 
     blueprints = load_blueprints(bp_path)
-    logger.info("블루프린트 %d개 로드", len(blueprints))
+    logger.info("블루프린트 %d개 로드, 병렬 워커 %d개", len(blueprints), N_WORKERS)
 
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
 
-    llm_results: list[BenchmarkResult] = []
-    simple_results: list[BenchmarkResult] = []
+    # 블루프린트 이름 순서 보존용 (결과 정렬)
+    bp_names = [bp["name"] for bp in blueprints]
+    llm_map: dict[str, BenchmarkResult] = {}
+    pid_map: dict[str, BenchmarkResult] = {}
+    prop_map: dict[str, BenchmarkResult] = {}
 
-    for i, bp in enumerate(blueprints):
-        name = bp["name"]
-        logger.info("=" * 60)
-        logger.info("[%d/%d] 블루프린트: %s — %s", i + 1, len(blueprints), name, bp.get("description", ""))
-        logger.info("=" * 60)
+    with ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
+        futures = {
+            pool.submit(
+                _run_one_blueprint, i, len(blueprints), bp, RUNS_DIR,
+            ): bp["name"]
+            for i, bp in enumerate(blueprints)
+        }
 
-        # LLM+BO 컨트롤러
-        logger.info("--- LLM+BO 컨트롤러 실행 ---")
-        llm_r = run_blueprint_llm(bp, RUNS_DIR)
-        llm_results.append(llm_r)
-        logger.info(
-            "[%s/llm] 완료: keff=%.5f dev=%.5f converged=%s time=%.1fs",
-            name, llm_r.final_keff, llm_r.final_deviation,
-            llm_r.converged, llm_r.total_runtime,
-        )
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                llm_r, pid_r, prop_r = future.result()
+                llm_map[name] = llm_r
+                pid_map[name] = pid_r
+                prop_map[name] = prop_r
+            except Exception as e:
+                logger.error("[%s] 치명적 에러: %s", name, e, exc_info=True)
+                for m, ct in [(llm_map, "llm"), (pid_map, "pid"), (prop_map, "proportional")]:
+                    m[name] = BenchmarkResult(
+                        blueprint_name=name, controller_type=ct, error=str(e),
+                    )
 
-        # Simple 컨트롤러 (비교군)
-        logger.info("--- Simple 컨트롤러 실행 ---")
-        simple_r = run_blueprint_simple(bp, RUNS_DIR)
-        simple_results.append(simple_r)
-        logger.info(
-            "[%s/simple] 완료: keff=%.5f dev=%.5f converged=%s time=%.1fs",
-            name, simple_r.final_keff, simple_r.final_deviation,
-            simple_r.converged, simple_r.total_runtime,
-        )
+    # 원래 블루프린트 순서로 정렬
+    llm_results = [llm_map[n] for n in bp_names]
+    pid_results = [pid_map[n] for n in bp_names]
+    prop_results = [prop_map[n] for n in bp_names]
 
     # 보고서 생성
     report_path = RUNS_DIR / "benchmark_report.json"
-    generate_report(llm_results, simple_results, report_path)
+    generate_report(llm_results, pid_results, prop_results, report_path)
 
     # 콘솔 요약
-    print("\n" + "=" * 70)
-    print("벤치마크 결과 요약")
-    print("=" * 70)
-    print(f"{'Blueprint':<12} {'LLM keff':>10} {'LLM dev':>10} {'LLM conv':>10} "
-          f"{'Simple keff':>12} {'Simple dev':>12}")
-    print("-" * 70)
-    for llm_r, simple_r in zip(llm_results, simple_results):
+    print("\n" + "=" * 90)
+    print("벤치마크 결과 요약: LLM+BO vs PID vs P-only")
+    print("=" * 90)
+    print(
+        f"{'Blueprint':<12} "
+        f"{'LLM keff':>10} {'dev':>8} {'conv':>5}  "
+        f"{'PID keff':>10} {'dev':>8} {'conv':>5}  "
+        f"{'P-only keff':>12} {'dev':>8} {'conv':>5}"
+    )
+    print("-" * 90)
+    for llm_r, pid_r, prop_r in zip(llm_results, pid_results, prop_results):
         print(
             f"{llm_r.blueprint_name:<12} "
-            f"{llm_r.final_keff:>10.5f} {llm_r.final_deviation:>10.5f} "
-            f"{'✓' if llm_r.converged else '✗':>10} "
-            f"{simple_r.final_keff:>12.5f} {simple_r.final_deviation:>12.5f}"
+            f"{llm_r.final_keff:>10.5f} {llm_r.final_deviation:>8.5f} "
+            f"{'Y' if llm_r.converged else 'N':>5}  "
+            f"{pid_r.final_keff:>10.5f} {pid_r.final_deviation:>8.5f} "
+            f"{'Y' if pid_r.converged else 'N':>5}  "
+            f"{prop_r.final_keff:>12.5f} {prop_r.final_deviation:>8.5f} "
+            f"{'Y' if prop_r.converged else 'N':>5}"
         )
-    print("=" * 70)
+    print("=" * 90)
     print(f"보고서: {report_path}")
 
 
