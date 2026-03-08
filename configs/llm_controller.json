@@ -4,13 +4,13 @@
     "llm_base_url": "http://localhost:8001/v1",
     "llm_model": "qwen3.5",
     "n_candidates": 10,
-    "initial_rod_position": 228,
+    "initial_rod_position": 14,
     "rod_position_min": 0,
     "rod_position_max": 228,
     "target_keff": 1.0,
     "keff_tolerance": 0.01,
-    "keff_critical_deviation": 0.05,
-    "max_iterations": 12,
+    "keff_critical_deviation": 0.50,
+    "max_iterations": 50,
     "log_dir": "runs/llm_logs"
   },
   "simulation": {

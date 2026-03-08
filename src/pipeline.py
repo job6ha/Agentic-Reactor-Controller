@@ -96,8 +96,12 @@ class SimulationPipeline:
         Returns:
             파이프라인 실행 결과 요약.
         """
-        # 설정 파일의 simulation 설정을 초기 CaseConfig에 반영
-        initial_config = CaseConfig(settings=self._config.simulation)
+        # 설정 파일의 simulation + geometry + materials 설정을 초기 CaseConfig에 반영
+        initial_config = CaseConfig(
+            settings=self._config.simulation,
+            geometry=self._config.geometry,
+            materials=self._config.materials,
+        )
         state = ReactorState(current_config=initial_config)
         result = PipelineResult()
 

@@ -34,7 +34,7 @@ def controller(llm_config: LLMControllerConfig) -> LLMController:
         "src.controller.llm.controller.LLMPlanner"
     ) as MockPlanner:
         mock_planner = MockPlanner.return_value
-        mock_planner.generate.return_value = [-10, -5, -3, 0, 5]
+        mock_planner.generate.return_value = [218, 223, 225, 228, 233]
 
         ctrl = LLMController(llm_config)
         ctrl._planner = mock_planner

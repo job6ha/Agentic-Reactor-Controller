@@ -47,9 +47,9 @@ class LLMControllerConfig(BaseModel):
     )
     n_candidates: int = Field(default=10, gt=0, description="LLM이 생성할 후보 수")
     initial_rod_position: int = Field(
-        default=228,
+        default=14,
         ge=0,
-        description="초기 제어봉 위치 (steps, 228=완전 인출)",
+        description="초기 제어봉 위치 (steps, 아임계 근처 시작)",
     )
     rod_position_min: int = Field(
         default=0,
@@ -68,19 +68,24 @@ class LLMControllerConfig(BaseModel):
         description="keff 수렴 허용 오차",
     )
     keff_critical_deviation: float = Field(
-        default=0.05,
+        default=0.50,
         gt=0,
-        description="keff 이탈 판정 기준",
+        description="keff 이탈 판정 기준 (아임계 시작 허용)",
     )
     max_iterations: int = Field(
-        default=12,
+        default=50,
         gt=0,
         description="최대 반복 횟수 (= depletion step 수)",
     )
     max_single_movement: int = Field(
-        default=50,
+        default=7,
         gt=0,
-        description="단일 스텝 최대 이동량 (안전 제한)",
+        description="단일 스텝 최대 이동량 (안전 제한, PWR 기준 5~10 steps)",
+    )
+    llm_max_retries: int = Field(
+        default=3,
+        ge=0,
+        description="LLM 응답 파싱 실패 시 최대 재시도 횟수",
     )
     log_dir: Path = Field(
         default=Path("runs/llm_logs"),
@@ -120,8 +125,8 @@ class ScoredCandidate(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    rod_movement: int = Field(description="제어봉 이동 스텝 수")
-    rod_position_after: int = Field(description="이동 후 제어봉 위치")
+    rod_movement: float = Field(description="제어봉 이동량")
+    rod_position_after: float = Field(description="이동 후 제어봉 위치")
     predicted_keff: float = Field(description="GP 예측 keff")
     safety_score: float = Field(ge=0.0, le=1.0, description="안전 점수")
 
@@ -130,10 +135,10 @@ class ScoredCandidate(BaseModel):
         return Action(
             action_type=ActionType.MODIFY_PARAM,
             field_path="geometry.extra_params.rod_position",
-            value=float(self.rod_position_after),
+            value=self.rod_position_after,
             reason=(
-                f"LLM+BO 선택: 이동={self.rod_movement}, "
-                f"위치={self.rod_position_after}, "
+                f"LLM+BO 선택: 이동={self.rod_movement:.1f}, "
+                f"위치={self.rod_position_after:.1f}, "
                 f"예측keff={self.predicted_keff:.5f}, "
                 f"안전점수={self.safety_score:.3f}"
             ),
@@ -150,7 +155,7 @@ class CandidateLog(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    rod_movement: int = Field(description="제어봉 이동 스텝 수")
+    rod_movement: float = Field(description="제어봉 이동량")
     safety_score: float = Field(description="안전 점수")
 
 
@@ -175,8 +180,8 @@ class LogEntry(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="기록 시각 (UTC)",
     )
-    rod_movement: int = Field(description="선택된 제어봉 이동값")
-    rod_position_after: int = Field(description="이동 후 제어봉 위치")
+    rod_movement: float = Field(description="선택된 제어봉 이동량")
+    rod_position_after: float = Field(description="이동 후 제어봉 위치")
     keff: float = Field(description="실측 keff")
     keff_std: float = Field(ge=0, description="keff 표준편차")
     safety_score: float = Field(ge=0.0, le=1.0, description="안전 점수")

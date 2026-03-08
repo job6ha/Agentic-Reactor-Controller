@@ -21,7 +21,7 @@ class TestScoreUnfitted:
 
     def test_returns_default_scores(self) -> None:
         opt = BayesianOptimizer()
-        scored = opt.score([0, -5, 5], current_position=228)
+        scored = opt.score([228, 223, 233], current_position=228)
 
         assert len(scored) == 3
         for c in scored:
@@ -30,15 +30,22 @@ class TestScoreUnfitted:
 
     def test_position_clamping_max(self) -> None:
         opt = BayesianOptimizer()
-        scored = opt.score([100], current_position=200, position_max=228)
+        scored = opt.score([300], current_position=200, position_max=228)
 
         assert scored[0].rod_position_after == 228
 
     def test_position_clamping_min(self) -> None:
         opt = BayesianOptimizer()
-        scored = opt.score([-300], current_position=100, position_min=0)
+        scored = opt.score([-100], current_position=100, position_min=0)
 
         assert scored[0].rod_position_after == 0
+
+    def test_movement_computed_correctly(self) -> None:
+        opt = BayesianOptimizer()
+        scored = opt.score([200], current_position=228)
+
+        assert scored[0].rod_movement == -28
+        assert scored[0].rod_position_after == 200
 
 
 class TestRefit:
@@ -83,7 +90,7 @@ class TestScoreFitted:
         return opt
 
     def test_scores_vary_by_position(self, fitted_optimizer: BayesianOptimizer) -> None:
-        scored = fitted_optimizer.score([-78, -28, 0], current_position=178)
+        scored = fitted_optimizer.score([100, 150, 178], current_position=178)
         # position 100, 150, 178
         scores = [c.safety_score for c in scored]
         # 150 근처가 가장 높아야 함
@@ -93,7 +100,7 @@ class TestScoreFitted:
     def test_predicted_keff_reasonable(
         self, fitted_optimizer: BayesianOptimizer
     ) -> None:
-        scored = fitted_optimizer.score([0], current_position=150)
+        scored = fitted_optimizer.score([150], current_position=150)
         # 학습 데이터에서 position=150 → keff=1.0
         assert abs(scored[0].predicted_keff - 1.0) < 0.05
 
@@ -101,7 +108,7 @@ class TestScoreFitted:
         self, fitted_optimizer: BayesianOptimizer
     ) -> None:
         """초임계(keff>1.0) 페널티가 아임계보다 엄격."""
-        scored = fitted_optimizer.score([-78, 50], current_position=150)
+        scored = fitted_optimizer.score([72, 200], current_position=150)
         # position 72 (keff<1.0), position 200 (keff>1.0)
         sub_critical = scored[0]  # 아임계
         super_critical = scored[1]  # 초임계
@@ -122,7 +129,7 @@ class TestSafetyScoreProperties:
         observations = [(100, 0.95), (150, 1.00), (200, 1.05)]
         opt.refit(observations)
 
-        scored = opt.score([0], current_position=150)
+        scored = opt.score([150], current_position=150)
         assert scored[0].safety_score > 0.8
 
     def test_score_bounded_zero_to_one(self) -> None:
@@ -131,7 +138,7 @@ class TestSafetyScoreProperties:
         opt.refit(observations)
 
         scored = opt.score(
-            list(range(-200, 200, 10)),
+            list(range(0, 228, 10)),
             current_position=100,
         )
         for c in scored:

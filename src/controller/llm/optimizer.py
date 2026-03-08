@@ -69,15 +69,15 @@ class BayesianOptimizer:
 
     def score(
         self,
-        movements: list[int],
-        current_position: int,
-        position_min: int = 0,
-        position_max: int = 228,
+        positions: list[float],
+        current_position: float,
+        position_min: float = 0.0,
+        position_max: float = 228.0,
     ) -> list[ScoredCandidate]:
-        """후보 이동값에 안전 점수를 부여한다.
+        """목표 위치 후보에 안전 점수를 부여한다.
 
         Args:
-            movements: 제어봉 이동값 후보 리스트.
+            positions: 제어봉 목표 위치 후보 리스트.
             current_position: 현재 제어봉 위치.
             position_min: 제어봉 최소 위치.
             position_max: 제어봉 최대 위치.
@@ -87,9 +87,9 @@ class BayesianOptimizer:
         """
         results: list[ScoredCandidate] = []
 
-        for movement in movements:
-            position = current_position + movement
-            position = max(position_min, min(position_max, position))
+        for target_position in positions:
+            position = max(position_min, min(position_max, target_position))
+            movement = position - current_position
 
             if self._is_fitted:
                 x_pred = np.array([[position]])
@@ -112,7 +112,7 @@ class BayesianOptimizer:
 
         return results
 
-    def refit(self, observations: list[tuple[int, float]]) -> None:
+    def refit(self, observations: list[tuple[float, float]]) -> None:
         """과거 관측 데이터로 GP 모델을 재피팅한다.
 
         Args:

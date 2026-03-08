@@ -22,11 +22,11 @@ class TestLLMControllerConfig:
         assert config.controller_type == "llm"
         assert config.llm_base_url == "http://localhost:8001/v1"
         assert config.n_candidates == 10
-        assert config.initial_rod_position == 228
+        assert config.initial_rod_position == 14
         assert config.rod_position_min == 0
         assert config.rod_position_max == 228
         assert config.target_keff == 1.0
-        assert config.max_iterations == 12
+        assert config.max_iterations == 50
 
     def test_custom_values(self) -> None:
         config = LLMControllerConfig(

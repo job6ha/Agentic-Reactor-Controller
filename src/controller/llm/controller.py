@@ -46,7 +46,7 @@ class LLMController(BaseController):
         )
         self._optimizer = BayesianOptimizer(target_keff=config.target_keff)
         self._log_store = LogStore(config.log_dir)
-        self._rod_position = config.initial_rod_position
+        self._rod_position = float(config.initial_rod_position)
         self._step = 0
         self._last_scored: list[ScoredCandidate] = []
         self._last_best: ScoredCandidate | None = None
@@ -58,7 +58,7 @@ class LLMController(BaseController):
             self._step = len(observations)
             self._rod_position = observations[-1][0]
             logger.info(
-                "기존 로그 복원: step=%d, rod_position=%d",
+                "기존 로그 복원: step=%d, rod_position=%.1f",
                 self._step,
                 self._rod_position,
             )
@@ -114,24 +114,31 @@ class LLMController(BaseController):
                     )
                 ]
 
-        # LLM으로 후보 생성
-        movements = self._planner.generate(
+        # LLM으로 목표 위치 후보 생성 (과거 로그를 이력으로 전달)
+        log_entries = self._log_store.load()
+        history_log = [e.model_dump(mode="json") for e in log_entries]
+        positions = self._planner.generate(
             state,
             self._rod_position,
             n=self._config.n_candidates,
             max_movement=self._config.max_single_movement,
+            max_retries=self._config.llm_max_retries,
+            history_log=history_log,
         )
 
         # BO로 후보 점수 부여
         self._last_scored = self._optimizer.score(
-            movements,
+            positions,
             self._rod_position,
             position_min=self._config.rod_position_min,
             position_max=self._config.rod_position_max,
         )
 
-        # 최고 점수 후보 선택
-        self._last_best = max(self._last_scored, key=lambda c: c.safety_score)
+        # 최고 점수 후보 선택 (동점 시 현재 위치에서 가장 큰 변화 우선)
+        self._last_best = max(
+            self._last_scored,
+            key=lambda c: (c.safety_score, -abs(c.rod_movement) if c.rod_movement == 0 else abs(c.rod_movement)),
+        )
 
         logger.info(
             "후보 선택: movement=%d, position=%d, safety=%.3f",
