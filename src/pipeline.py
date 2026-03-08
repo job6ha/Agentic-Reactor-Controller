@@ -3,6 +3,9 @@
 설정 파일을 로드하여 Controller 기반 시뮬레이션 루프를 자동 실행한다.
 propose → execute → evaluate → update 사이클을 반복하고,
 수렴 또는 종료 조건 충족 시 결과를 수집하여 보고서를 생성한다.
+
+컨트롤러 팩토리를 통해 SimpleController, LLMController 등
+다양한 컨트롤러를 설정 기반으로 동적 생성한다.
 """
 
 from __future__ import annotations
@@ -13,14 +16,18 @@ from pathlib import Path
 
 from src.armi_layer.case_folder import create_case
 from src.armi_layer.case_manager import CaseManager
-from src.armi_layer.models import CaseConfig, ReactorState, SimulationResult
+from src.armi_layer.models import (
+    CaseConfig,
+    ReactorState,
+    SimulationResult,
+)
 from src.armi_layer.result_collector import (
     collect_results,
     export_csv,
     export_json,
 )
-from src.controller.base import ActionType
-from src.controller.simple import SimpleController
+from src.controller.base import ActionType, BaseController
+from src.controller.factory import create_controller
 from src.openmc_layer.input_generator import generate_input
 from src.openmc_layer.kpi_calculator import calculate_kpi, save_kpi
 from src.openmc_layer.result_parser import parse_results
@@ -57,13 +64,15 @@ class SimulationPipeline:
     Controller의 제안에 따라 시뮬레이션을 반복 실행하고,
     수렴 시 결과를 수집하여 보고서를 생성한다.
 
+    컨트롤러는 설정의 ``controller_type``에 따라 팩토리에서 자동 생성된다.
+
     Args:
         config: 파이프라인 설정.
     """
 
     def __init__(self, config: PipelineConfig) -> None:
         self._config = config
-        self._controller = SimpleController(config.controller)
+        self._controller: BaseController = create_controller(config.controller)
         self._run_config = config.run
         self._runs_dir = config.output.runs_dir
         self._case_manager = CaseManager(self._runs_dir)
@@ -87,14 +96,13 @@ class SimulationPipeline:
         Returns:
             파이프라인 실행 결과 요약.
         """
-        state = ReactorState()
+        # 설정 파일의 simulation 설정을 초기 CaseConfig에 반영
+        initial_config = CaseConfig(settings=self._config.simulation)
+        state = ReactorState(current_config=initial_config)
         result = PipelineResult()
 
-        logger.info(
-            "파이프라인 시작: sweep_field=%s, sweep_values=%s",
-            self._config.controller.sweep_field,
-            self._config.controller.sweep_values,
-        )
+        ctrl_name = type(self._controller).__name__
+        logger.info("파이프라인 시작: controller_type=%s", ctrl_name)
 
         while True:
             # 1. Controller에게 다음 행동 제안 요청

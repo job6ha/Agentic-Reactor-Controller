@@ -8,7 +8,7 @@ keff 수렴 여부를 판정하는 베이스라인 컨트롤러.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,6 +36,10 @@ class SimpleControllerConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    controller_type: Literal["simple"] = Field(
+        default="simple",
+        description="컨트롤러 유형 식별자",
+    )
     sweep_field: str = Field(
         default="materials.fuel_enrichment",
         description="스윕할 파라미터 경로",
