@@ -1,11 +1,17 @@
 {
   "controller": {
-    "controller_type": "simple",
-    "sweep_field": "materials.fuel_enrichment",
-    "sweep_values": [2.0, 3.0, 4.0, 5.0],
+    "controller_type": "llm",
+    "llm_base_url": "http://localhost:8001/v1",
+    "llm_model": "qwen3.5",
+    "n_candidates": 10,
+    "initial_rod_position": 228,
+    "rod_position_min": 0,
+    "rod_position_max": 228,
     "target_keff": 1.0,
     "keff_tolerance": 0.01,
-    "max_iterations": 10
+    "keff_critical_deviation": 0.05,
+    "max_iterations": 12,
+    "log_dir": "runs/llm_logs"
   },
   "simulation": {
     "batches": 1000,

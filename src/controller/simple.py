@@ -8,12 +8,13 @@ keff 수렴 여부를 판정하는 베이스라인 컨트롤러.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.armi_layer.models import CaseConfig, ReactorState, SimulationResult
 from src.controller.base import Action, ActionType, BaseController
+from src.controller.utils import set_nested
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,10 @@ class SimpleControllerConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    controller_type: Literal["simple"] = Field(
+        default="simple",
+        description="컨트롤러 유형 식별자",
+    )
     sweep_field: str = Field(
         default="materials.fuel_enrichment",
         description="스윕할 파라미터 경로",
@@ -165,7 +170,7 @@ class SimpleController(BaseController):
 
         for action in actions:
             if action.action_type == ActionType.MODIFY_PARAM and action.field_path:
-                _set_nested(data, action.field_path, action.value)
+                set_nested(data, action.field_path, action.value)
 
         config = CaseConfig.model_validate(data)
 
@@ -220,10 +225,4 @@ class SimpleController(BaseController):
         )
 
 
-def _set_nested(data: dict[str, Any], field_path: str, value: object) -> None:
-    """중첩 딕셔너리에서 dot notation 경로로 값을 설정한다."""
-    keys = field_path.split(".")
-    current = data
-    for key in keys[:-1]:
-        current = current[key]
-    current[keys[-1]] = value
+__all__ = ["SimpleController", "SimpleControllerConfig"]
