@@ -134,8 +134,11 @@ class LLMController(BaseController):
             position_max=self._config.rod_position_max,
         )
 
-        # 최고 점수 후보 선택
-        self._last_best = max(self._last_scored, key=lambda c: c.safety_score)
+        # 최고 점수 후보 선택 (동점 시 현재 위치에서 가장 큰 변화 우선)
+        self._last_best = max(
+            self._last_scored,
+            key=lambda c: (c.safety_score, -abs(c.rod_movement) if c.rod_movement == 0 else abs(c.rod_movement)),
+        )
 
         logger.info(
             "후보 선택: movement=%d, position=%d, safety=%.3f",

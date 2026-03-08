@@ -203,7 +203,20 @@ class LLMPlanner:
             response.raise_for_status()
 
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        message = data["choices"][0]["message"]
+        content = message.get("content", "") or ""
+
+        # mlx-lm 등 일부 서버는 thinking을 reasoning 필드로 분리하고
+        # content를 비워두는 경우가 있음 → reasoning에서 답변 추출
+        if not content.strip() and "reasoning" in message:
+            reasoning = message["reasoning"] or ""
+            # reasoning 끝부분에서 JSON 배열 추출 시도
+            json_match = re.search(r"\[[\d\s,]+\]", reasoning)
+            if json_match:
+                content = json_match.group()
+                logger.info("content 비어있어 reasoning에서 추출: %s", content[:80])
+
+        return content
 
     def _parse_response(self, response_text: str, n: int) -> list[int]:
         """LLM 응답에서 목표 위치 정수 리스트를 추출한다.
@@ -223,6 +236,8 @@ class LLMPlanner:
         """
         # thinking 태그 제거 (Qwen3.5 등 thinking 모드 LLM 대응)
         cleaned = re.sub(r"<think>[\s\S]*?</think>", "", response_text).strip()
+        # markdown 코드 블록 제거 (```json ... ```)
+        cleaned = re.sub(r"```(?:json)?\s*", "", cleaned).strip()
         if not cleaned:
             raise ValueError(
                 f"LLM 응답에서 정수를 추출할 수 없음: {response_text[:100]}"
