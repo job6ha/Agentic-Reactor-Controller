@@ -60,7 +60,7 @@ RUN_CONFIG = RunConfig(
     max_retries=1,
 )
 
-MAX_STEPS = 6  # 벤치마크용 최대 스텝 (빠른 실행)
+MAX_STEPS = 20  # 벤치마크용 최대 스텝 (현실적 제어봉 이동 반영)
 RUNS_DIR = Path("runs/benchmark")
 
 

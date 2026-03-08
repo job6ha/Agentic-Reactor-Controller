@@ -26,7 +26,7 @@ class TestLLMControllerConfig:
         assert config.rod_position_min == 0
         assert config.rod_position_max == 228
         assert config.target_keff == 1.0
-        assert config.max_iterations == 12
+        assert config.max_iterations == 20
 
     def test_custom_values(self) -> None:
         config = LLMControllerConfig(

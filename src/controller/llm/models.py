@@ -73,14 +73,14 @@ class LLMControllerConfig(BaseModel):
         description="keff 이탈 판정 기준",
     )
     max_iterations: int = Field(
-        default=12,
+        default=20,
         gt=0,
         description="최대 반복 횟수 (= depletion step 수)",
     )
     max_single_movement: int = Field(
-        default=50,
+        default=7,
         gt=0,
-        description="단일 스텝 최대 이동량 (안전 제한)",
+        description="단일 스텝 최대 이동량 (안전 제한, PWR 기준 5~10 steps)",
     )
     llm_max_retries: int = Field(
         default=3,
