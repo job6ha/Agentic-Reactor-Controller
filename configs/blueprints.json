@@ -1,0 +1,89 @@
+{
+  "blueprints": [
+    {
+      "name": "PWR-STD",
+      "description": "표준 PWR pin cell (3.0% 농축, 제어봉 포함)",
+      "geometry": {"absorber_outer_radius": 0.52},
+      "materials": {},
+      "initial_rod_position": 228,
+      "tags": ["baseline"]
+    },
+    {
+      "name": "PWR-HE",
+      "description": "고농축 연료 (4.5%, 제어봉 포함)",
+      "geometry": {"absorber_outer_radius": 0.52},
+      "materials": {"fuel_enrichment": 4.5},
+      "initial_rod_position": 228,
+      "tags": ["high-enrichment"]
+    },
+    {
+      "name": "PWR-LE",
+      "description": "저농축 연료 (2.0%, 제어봉 포함)",
+      "geometry": {"absorber_outer_radius": 0.52},
+      "materials": {"fuel_enrichment": 2.0},
+      "initial_rod_position": 228,
+      "tags": ["low-enrichment"]
+    },
+    {
+      "name": "PWR-HT",
+      "description": "고온 냉각재 (620K, 제어봉 포함)",
+      "geometry": {"absorber_outer_radius": 0.52},
+      "materials": {"coolant_temperature": 620.0, "coolant_density": 0.65},
+      "initial_rod_position": 228,
+      "tags": ["high-temp"]
+    },
+    {
+      "name": "PWR-LT",
+      "description": "저온 냉각재 (560K, 제어봉 포함)",
+      "geometry": {"absorber_outer_radius": 0.52},
+      "materials": {"coolant_temperature": 560.0, "coolant_density": 0.76},
+      "initial_rod_position": 228,
+      "tags": ["low-temp"]
+    },
+    {
+      "name": "PWR-TP",
+      "description": "촘촘한 격자 (pitch 1.20cm, 제어봉 포함)",
+      "geometry": {"pitch": 1.20, "absorber_outer_radius": 0.50},
+      "materials": {},
+      "initial_rod_position": 228,
+      "tags": ["tight-pitch"]
+    },
+    {
+      "name": "PWR-WP",
+      "description": "넓은 격자 (pitch 1.35cm, 제어봉 포함)",
+      "geometry": {"pitch": 1.35, "absorber_outer_radius": 0.55},
+      "materials": {},
+      "initial_rod_position": 228,
+      "tags": ["wide-pitch"]
+    },
+    {
+      "name": "PWR-LF",
+      "description": "큰 연료봉 (반지름 0.42cm, 제어봉 포함)",
+      "geometry": {
+        "fuel_radius": 0.42,
+        "clad_inner_radius": 0.428,
+        "clad_outer_radius": 0.476,
+        "absorber_outer_radius": 0.54
+      },
+      "materials": {},
+      "initial_rod_position": 228,
+      "tags": ["large-fuel"]
+    },
+    {
+      "name": "PWR-MID",
+      "description": "중간 위치 시작 (rod=114, 3.5% 농축)",
+      "geometry": {"absorber_outer_radius": 0.52},
+      "materials": {"fuel_enrichment": 3.5},
+      "initial_rod_position": 114,
+      "tags": ["mid-rod"]
+    },
+    {
+      "name": "PWR-INS",
+      "description": "완전 삽입 시작 (rod=0, 고농축 4.0%)",
+      "geometry": {"absorber_outer_radius": 0.52},
+      "materials": {"fuel_enrichment": 4.0},
+      "initial_rod_position": 0,
+      "tags": ["inserted"]
+    }
+  ]
+}

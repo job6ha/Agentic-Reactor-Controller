@@ -16,7 +16,12 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
-from src.armi_layer.models import RunConfig, SimulationSettings
+from src.armi_layer.models import (
+    GeometryParams,
+    MaterialParams,
+    RunConfig,
+    SimulationSettings,
+)
 from src.controller.llm.models import LLMControllerConfig
 from src.controller.simple import SimpleControllerConfig
 
@@ -70,6 +75,14 @@ class PipelineConfig(BaseModel):
     simulation: SimulationSettings = Field(
         default_factory=SimulationSettings,
         description="OpenMC 시뮬레이션 설정 (batches, particles 등)",
+    )
+    geometry: GeometryParams = Field(
+        default_factory=GeometryParams,
+        description="기하 구조 설정 (제어봉 모델링 등)",
+    )
+    materials: MaterialParams = Field(
+        default_factory=MaterialParams,
+        description="재료 설정 (농축도, 밀도 등)",
     )
     run: RunConfig = Field(
         default_factory=RunConfig,

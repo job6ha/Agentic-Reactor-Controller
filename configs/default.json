@@ -12,6 +12,9 @@
     "inactive": 200,
     "particles": 50000
   },
+  "geometry": {
+    "absorber_outer_radius": 0.52
+  },
   "run": {
     "omp_threads": 4,
     "timeout": 7200,

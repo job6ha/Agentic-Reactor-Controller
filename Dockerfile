@@ -13,8 +13,13 @@ COPY src/ ./src/
 COPY tests/ ./tests/
 COPY configs/ ./configs/
 
-# 의존성 설치
-RUN uv sync
+# scripts 복사
+COPY scripts/ ./scripts/
+
+# openmc venv에 프로젝트 의존성 설치
+ENV VIRTUAL_ENV=/openmc_venv
+ENV PATH="/openmc_venv/bin:$PATH"
+RUN pip install httpx "pydantic>=2" scikit-optimize scikit-learn numpy pandas h5py
 
 # runs 디렉토리 생성
 RUN mkdir -p /app/runs
@@ -23,4 +28,4 @@ RUN mkdir -p /app/runs
 ENV OMP_NUM_THREADS=4
 ENV PYTHONPATH=/app
 
-CMD ["uv", "run", "python", "-m", "src", "--config", "configs/default.json"]
+CMD ["/openmc_venv/bin/python3", "-m", "src", "--config", "configs/default.json"]

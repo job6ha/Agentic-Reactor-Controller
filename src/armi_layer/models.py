@@ -47,19 +47,41 @@ class GeometryParams(BaseModel):
     )
     pitch: float = Field(default=1.25984, gt=0, description="격자 피치 (cm)")
     fuel_height: float = Field(default=200.0, gt=0, description="연료 활성 높이 (cm)")
+    absorber_outer_radius: float | None = Field(
+        default=None,
+        description="B4C 흡수체 외경 (cm). None이면 제어봉 미모델링 (2D pin cell)",
+    )
+    rod_steps_max: int = Field(
+        default=228, gt=0, description="제어봉 최대 스텝 수 (완전 인출)"
+    )
     extra_params: dict[str, float] = Field(
-        default_factory=dict, description="추가 기하 파라미터"
+        default_factory=dict, description="추가 기하 파라미터 (rod_position 등)"
     )
 
     @model_validator(mode="after")
     def validate_geometry_ordering(self) -> "GeometryParams":
-        """fuel_radius < clad_inner < clad_outer < pitch/2 순서를 검증한다."""
+        """기하 구조 반지름 순서와 제어봉 파라미터를 검증한다."""
         if not (self.fuel_radius < self.clad_inner_radius < self.clad_outer_radius):
             raise ValueError(
                 "fuel_radius < clad_inner_radius < clad_outer_radius 순서여야 합니다"
             )
         if self.clad_outer_radius >= self.pitch / 2:
             raise ValueError("clad_outer_radius는 pitch/2보다 작아야 합니다")
+        if self.absorber_outer_radius is not None:
+            min_gap = 0.01  # cm, 물리적으로 의미 있는 최소 흡수체 두께
+            if self.absorber_outer_radius <= self.clad_outer_radius:
+                raise ValueError(
+                    "absorber_outer_radius는 clad_outer_radius보다 커야 합니다"
+                )
+            if self.absorber_outer_radius - self.clad_outer_radius < min_gap:
+                raise ValueError(
+                    "absorber_outer_radius - clad_outer_radius는 "
+                    f"{min_gap} cm 이상이어야 합니다"
+                )
+            if self.absorber_outer_radius >= self.pitch / 2:
+                raise ValueError(
+                    "absorber_outer_radius는 pitch/2보다 작아야 합니다"
+                )
         return self
 
 
@@ -88,6 +110,9 @@ class MaterialParams(BaseModel):
     )
     coolant_density: float = Field(default=0.7, gt=0, description="냉각재 밀도 (g/cm3)")
     clad_density: float = Field(default=6.55, gt=0, description="피복관 밀도 (g/cm3)")
+    absorber_density: float = Field(
+        default=2.52, gt=0, description="B4C 흡수체 밀도 (g/cm3)"
+    )
     extra_params: dict[str, float] = Field(
         default_factory=dict, description="추가 재료 파라미터"
     )
