@@ -69,10 +69,10 @@ class BayesianOptimizer:
 
     def score(
         self,
-        positions: list[int],
-        current_position: int,
-        position_min: int = 0,
-        position_max: int = 228,
+        positions: list[float],
+        current_position: float,
+        position_min: float = 0.0,
+        position_max: float = 228.0,
     ) -> list[ScoredCandidate]:
         """목표 위치 후보에 안전 점수를 부여한다.
 
@@ -112,7 +112,7 @@ class BayesianOptimizer:
 
         return results
 
-    def refit(self, observations: list[tuple[int, float]]) -> None:
+    def refit(self, observations: list[tuple[float, float]]) -> None:
         """과거 관측 데이터로 GP 모델을 재피팅한다.
 
         Args:

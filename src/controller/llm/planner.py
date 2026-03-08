@@ -36,10 +36,10 @@ SYSTEM_PROMPT = """\
 - 위치가 높을수록 제어봉이 인출되어 중성자 흡수 감소 → keff 증가
 - 목표: keff를 1.0에 가깝게 유지
 - 안전 우선: 급격한 이동보다 점진적 조정 선호
-- 정수값만 사용 (단위: steps, 0~228 범위)
+- 실수값 사용 가능 (소수점 1자리, 단위: steps, 0.0~228.0 범위)
+- 현재 위치에서 크게 벗어나지 않는 값을 제안하세요
 
-응답 형식: 반드시 JSON 배열로 0~228 범위의 정수만 반환하세요.
-예: [100, 110, 120, 130, 140, 150, 160, 170, 180, 190]
+응답 형식: 반드시 JSON 배열만 출력하세요. 다른 텍스트 없이 배열만 반환합니다.
 """
 
 
@@ -68,12 +68,12 @@ class LLMPlanner:
     def generate(
         self,
         state: ReactorState,
-        current_rod_position: int,
+        current_rod_position: float,
         n: int = 10,
-        max_movement: int = 50,
+        max_movement: float = 50.0,
         max_retries: int = 3,
         history_log: list[dict] | None = None,
-    ) -> list[int]:
+    ) -> list[float]:
         """LLM을 호출하여 제어봉 목표 위치 후보를 생성한다.
 
         파싱 실패 시 최대 ``max_retries``회 재호출하고,
@@ -89,7 +89,7 @@ class LLMPlanner:
             history_log: 과거 스텝 로그 (LogEntry.model_dump() 목록).
 
         Returns:
-            목표 위치 정수 리스트 (0~228).
+            목표 위치 실수 리스트 (0.0~228.0).
         """
         user_prompt = self._build_user_prompt(
             state, current_rod_position, n, history_log=history_log,
@@ -98,10 +98,22 @@ class LLMPlanner:
         positions: list[int] | None = None
         last_error: Exception | None = None
 
+        pos_min = max(0.0, current_rod_position - max_movement)
+        pos_max = min(228.0, current_rod_position + max_movement)
+
         for attempt in range(1 + max_retries):
             try:
                 response_text = self._call_llm(user_prompt)
-                positions = self._parse_response(response_text, n)
+                raw_positions = self._parse_response(response_text, n)
+
+                # 검증: 추출 값 중 이동 범위 안에 있는 것이 하나라도 있는지
+                in_range = [p for p in raw_positions if pos_min <= p <= pos_max]
+                if not in_range:
+                    raise ValueError(
+                        f"추출 위치 전부 이동 범위 밖: {raw_positions} "
+                        f"(허용: {pos_min}~{pos_max})"
+                    )
+                positions = raw_positions
                 break
             except Exception as e:
                 last_error = e
@@ -123,8 +135,6 @@ class LLMPlanner:
             positions = self._fallback_candidates(current_rod_position, n, max_movement)
 
         # 안전 제한: max_movement 범위 및 0~228 클램핑
-        pos_min = max(0, current_rod_position - max_movement)
-        pos_max = min(228, current_rod_position + max_movement)
         positions = [max(pos_min, min(pos_max, p)) for p in positions]
 
         logger.info("목표 위치 후보: %s (현재: %d)", positions, current_rod_position)
@@ -133,7 +143,7 @@ class LLMPlanner:
     def _build_user_prompt(
         self,
         state: ReactorState,
-        rod_position: int,
+        rod_position: float,
         n: int,
         history_log: list[dict] | None = None,
     ) -> str:
@@ -171,7 +181,7 @@ class LLMPlanner:
             f"{keff_info}\n"
             f"{history_info}\n\n"
             f"keff를 1.0에 가깝게 만들 제어봉 **목표 위치** 후보 {n}개를 "
-            f"JSON 배열(0~228 정수)로 제안하세요."
+            f"JSON 배열(0.0~228.0 실수)로 제안하세요."
         )
 
     def _call_llm(self, user_prompt: str) -> str:
@@ -210,29 +220,34 @@ class LLMPlanner:
         # content를 비워두는 경우가 있음 → reasoning에서 답변 추출
         if not content.strip() and "reasoning" in message:
             reasoning = message["reasoning"] or ""
-            # reasoning 끝부분에서 JSON 배열 추출 시도
-            json_match = re.search(r"\[[\d\s,]+\]", reasoning)
-            if json_match:
-                content = json_match.group()
-                logger.info("content 비어있어 reasoning에서 추출: %s", content[:80])
+            # reasoning에서 모든 JSON 배열을 찾고 마지막 것을 사용
+            # (LLM은 reasoning 끝에 최종 답변을 배치하는 경향이 있음)
+            all_matches = re.findall(r"\[[\d\s,\.]+\]", reasoning)
+            if all_matches:
+                content = all_matches[-1]
+                logger.info(
+                    "content 비어있어 reasoning에서 추출 (마지막 배열, %d개 중): %s",
+                    len(all_matches),
+                    content[:80],
+                )
 
         return content
 
-    def _parse_response(self, response_text: str, n: int) -> list[int]:
-        """LLM 응답에서 목표 위치 정수 리스트를 추출한다.
+    def _parse_response(self, response_text: str, n: int) -> list[float]:
+        """LLM 응답에서 목표 위치 실수 리스트를 추출한다.
 
         thinking 태그를 제거한 후, JSON 배열 파싱을 시도하고,
-        실패 시 정규식으로 정수를 추출한다.
+        실패 시 정규식으로 수치를 추출한다.
 
         Args:
             response_text: LLM 응답 텍스트.
             n: 필요한 후보 수.
 
         Returns:
-            목표 위치 정수 리스트.
+            목표 위치 실수 리스트.
 
         Raises:
-            ValueError: 유효한 정수를 추출할 수 없을 때.
+            ValueError: 유효한 수치를 추출할 수 없을 때.
         """
         # thinking 태그 제거 (Qwen3.5 등 thinking 모드 LLM 대응)
         cleaned = re.sub(r"<think>[\s\S]*?</think>", "", response_text).strip()
@@ -240,7 +255,7 @@ class LLMPlanner:
         cleaned = re.sub(r"```(?:json)?\s*", "", cleaned).strip()
         if not cleaned:
             raise ValueError(
-                f"LLM 응답에서 정수를 추출할 수 없음: {response_text[:100]}"
+                f"LLM 응답에서 수치를 추출할 수 없음: {response_text[:100]}"
             )
 
         # JSON 배열 파싱 시도
@@ -251,16 +266,16 @@ class LLMPlanner:
                 if isinstance(parsed, list) and all(
                     isinstance(v, int | float) for v in parsed
                 ):
-                    positions = [int(v) for v in parsed]
+                    positions = [float(v) for v in parsed]
                     if positions:
                         return positions[:n]
             except json.JSONDecodeError:
                 pass
 
-        # 정규식으로 정수 추출 시도 (cleaned 텍스트 사용)
-        integers = [int(m) for m in re.findall(r"\d+", cleaned)]
+        # 정규식으로 수치 추출 시도 (정수 및 소수점 포함)
+        numbers = [float(m) for m in re.findall(r"\d+\.?\d*", cleaned)]
         # 0~228 범위인 값만 필터링
-        valid = [v for v in integers if 0 <= v <= 228]
+        valid = [v for v in numbers if 0.0 <= v <= 228.0]
         if valid:
             return valid[:n]
 
@@ -268,10 +283,10 @@ class LLMPlanner:
 
     def _fallback_candidates(
         self,
-        current_position: int,
+        current_position: float,
         n: int,
-        max_movement: int,
-    ) -> list[int]:
+        max_movement: float,
+    ) -> list[float]:
         """현재 위치 주변의 폴백 후보를 생성한다.
 
         현재 위치를 포함하고, max_movement 범위에서 균등 샘플링한다.
@@ -282,13 +297,12 @@ class LLMPlanner:
             max_movement: 최대 이동량.
 
         Returns:
-            목표 위치 정수 리스트.
+            목표 위치 실수 리스트.
         """
-        pos_min = max(0, current_position - max_movement)
-        pos_max = min(228, current_position + max_movement)
+        pos_min = max(0.0, current_position - max_movement)
+        pos_max = min(228.0, current_position + max_movement)
 
-        candidates = [current_position]  # 현 위치 유지 항상 포함
-        pool = [p for p in range(pos_min, pos_max + 1) if p != current_position]
-        sample_size = min(n - 1, len(pool))
-        candidates.extend(random.sample(pool, sample_size))
+        candidates: list[float] = [current_position]
+        for _ in range(n - 1):
+            candidates.append(round(random.uniform(pos_min, pos_max), 1))
         return candidates[:n]

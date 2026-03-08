@@ -46,7 +46,7 @@ class LLMController(BaseController):
         )
         self._optimizer = BayesianOptimizer(target_keff=config.target_keff)
         self._log_store = LogStore(config.log_dir)
-        self._rod_position = config.initial_rod_position
+        self._rod_position = float(config.initial_rod_position)
         self._step = 0
         self._last_scored: list[ScoredCandidate] = []
         self._last_best: ScoredCandidate | None = None
@@ -58,7 +58,7 @@ class LLMController(BaseController):
             self._step = len(observations)
             self._rod_position = observations[-1][0]
             logger.info(
-                "기존 로그 복원: step=%d, rod_position=%d",
+                "기존 로그 복원: step=%d, rod_position=%.1f",
                 self._step,
                 self._rod_position,
             )

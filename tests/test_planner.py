@@ -64,10 +64,10 @@ class TestParseResponse:
         with pytest.raises(ValueError, match="유효한 위치를 추출할 수 없음"):
             planner._parse_response("위치가 없습니다.", n=5)
 
-    def test_float_values_converted_to_int(self, planner: LLMPlanner) -> None:
-        result = planner._parse_response("[100.0, 150.0, 200.0]", n=3)
-        assert result == [100, 150, 200]
-        assert all(isinstance(v, int) for v in result)
+    def test_float_values_preserved(self, planner: LLMPlanner) -> None:
+        result = planner._parse_response("[100.0, 150.5, 200.3]", n=3)
+        assert result == [100.0, 150.5, 200.3]
+        assert all(isinstance(v, float) for v in result)
 
     def test_thinking_tag_stripped(self, planner: LLMPlanner) -> None:
         response = (
@@ -79,7 +79,7 @@ class TestParseResponse:
 
     def test_thinking_only_raises(self, planner: LLMPlanner) -> None:
         response = "<think>생각 중...</think>"
-        with pytest.raises(ValueError, match="정수를 추출할 수 없음"):
+        with pytest.raises(ValueError, match="수치를 추출할 수 없음"):
             planner._parse_response(response, n=5)
 
     def test_thinking_with_numbers_ignored(self, planner: LLMPlanner) -> None:
@@ -112,11 +112,11 @@ class TestFallbackCandidates:
         )
         assert 150 in candidates
 
-    def test_all_integers(self, planner: LLMPlanner) -> None:
+    def test_all_floats(self, planner: LLMPlanner) -> None:
         candidates = planner._fallback_candidates(
             current_position=150, n=10, max_movement=50,
         )
-        assert all(isinstance(v, int) for v in candidates)
+        assert all(isinstance(v, float | int) for v in candidates)
 
     def test_within_range(self, planner: LLMPlanner) -> None:
         candidates = planner._fallback_candidates(
@@ -167,7 +167,7 @@ class TestGenerate:
 
     @patch.object(LLMPlanner, "_call_llm")
     def test_success(self, mock_call: MagicMock, planner: LLMPlanner) -> None:
-        mock_call.return_value = "[100, 110, 120, 130, 140, 150, 160, 170, 180, 190]"
+        mock_call.return_value = "[180, 185, 190, 195, 200, 205, 210, 215, 220, 225]"
         state = ReactorState()
 
         result = planner.generate(state, current_rod_position=200, n=10)
@@ -215,7 +215,8 @@ class TestGenerate:
         self, mock_call: MagicMock, planner: LLMPlanner
     ) -> None:
         """max_movement 범위로 클램핑."""
-        mock_call.return_value = "[0, 50, 100, 228]"
+        # 일부는 범위 안, 일부는 밖 → 범위 안 값 존재하므로 통과, 밖 값은 클램핑
+        mock_call.return_value = "[130, 150, 170, 228]"
         state = ReactorState()
 
         result = planner.generate(
@@ -224,3 +225,38 @@ class TestGenerate:
 
         # 150 ± 30 = [120, 180] 범위로 클램핑
         assert all(120 <= p <= 180 for p in result)
+
+    @patch.object(LLMPlanner, "_call_llm")
+    def test_out_of_range_positions_trigger_retry(
+        self, mock_call: MagicMock, planner: LLMPlanner
+    ) -> None:
+        """추출된 위치가 전부 이동 범위 밖이면 리트라이한다."""
+        mock_call.side_effect = [
+            "[100, 110, 120, 130, 140, 150, 160, 170, 180, 190]",  # 전부 범위 밖
+            "[15, 16, 17, 18, 19, 20]",  # 범위 안
+        ]
+        state = ReactorState()
+
+        result = planner.generate(
+            state, current_rod_position=17, n=6, max_movement=7,
+        )
+
+        assert mock_call.call_count == 2
+        assert all(10 <= p <= 24 for p in result)
+
+    @patch.object(LLMPlanner, "_call_llm")
+    def test_all_out_of_range_uses_fallback(
+        self, mock_call: MagicMock, planner: LLMPlanner
+    ) -> None:
+        """범위 밖 위치가 모든 리트라이에서 반복되면 폴백 사용."""
+        mock_call.return_value = "[100, 110, 120, 130, 140]"
+        state = ReactorState()
+
+        result = planner.generate(
+            state, current_rod_position=17, n=5, max_movement=7, max_retries=2,
+        )
+
+        # 폴백: 현재 위치(17) 포함, 10~24 범위
+        assert 17 in result
+        assert all(10 <= p <= 24 for p in result)
+        assert mock_call.call_count == 3  # 1 + 2 retries
