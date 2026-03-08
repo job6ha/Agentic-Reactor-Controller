@@ -82,6 +82,11 @@ class LLMControllerConfig(BaseModel):
         gt=0,
         description="단일 스텝 최대 이동량 (안전 제한)",
     )
+    llm_max_retries: int = Field(
+        default=3,
+        ge=0,
+        description="LLM 응답 파싱 실패 시 최대 재시도 횟수",
+    )
     log_dir: Path = Field(
         default=Path("runs/llm_logs"),
         description="로그 저장 디렉토리",

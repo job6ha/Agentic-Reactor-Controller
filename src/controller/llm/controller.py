@@ -114,17 +114,21 @@ class LLMController(BaseController):
                     )
                 ]
 
-        # LLM으로 후보 생성
-        movements = self._planner.generate(
+        # LLM으로 목표 위치 후보 생성 (과거 로그를 이력으로 전달)
+        log_entries = self._log_store.load()
+        history_log = [e.model_dump(mode="json") for e in log_entries]
+        positions = self._planner.generate(
             state,
             self._rod_position,
             n=self._config.n_candidates,
             max_movement=self._config.max_single_movement,
+            max_retries=self._config.llm_max_retries,
+            history_log=history_log,
         )
 
         # BO로 후보 점수 부여
         self._last_scored = self._optimizer.score(
-            movements,
+            positions,
             self._rod_position,
             position_min=self._config.rod_position_min,
             position_max=self._config.rod_position_max,

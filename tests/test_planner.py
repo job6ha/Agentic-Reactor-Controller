@@ -1,4 +1,7 @@
-"""LLMPlanner 테스트 (KAE-89)."""
+"""LLMPlanner 테스트 (KAE-91).
+
+절대 위치 기반 프롬프트 + 리트라이 로직 테스트.
+"""
 
 from __future__ import annotations
 
@@ -37,50 +40,95 @@ class TestPlannerInit:
 
 
 class TestParseResponse:
-    """_parse_response 테스트."""
+    """_parse_response 테스트 — 절대 위치 기반."""
 
     def test_json_array(self, planner: LLMPlanner) -> None:
-        result = planner._parse_response("[-5, -3, 0, 3, 5]", n=5)
-        assert result == [-5, -3, 0, 3, 5]
+        result = planner._parse_response("[100, 110, 120, 130, 140]", n=5)
+        assert result == [100, 110, 120, 130, 140]
 
     def test_json_array_with_text(self, planner: LLMPlanner) -> None:
-        response = "제안합니다:\n[-5, -3, 0, 3, 5]\n이상입니다."
+        response = "제안합니다:\n[100, 120, 140, 160, 180]\n이상입니다."
         result = planner._parse_response(response, n=5)
-        assert result == [-5, -3, 0, 3, 5]
+        assert result == [100, 120, 140, 160, 180]
 
     def test_truncates_to_n(self, planner: LLMPlanner) -> None:
-        result = planner._parse_response("[1, 2, 3, 4, 5, 6, 7]", n=3)
+        result = planner._parse_response("[100, 110, 120, 130, 140, 150, 160]", n=3)
         assert len(result) == 3
 
     def test_regex_fallback(self, planner: LLMPlanner) -> None:
-        response = "이동값: -5, -3, 0, 3, 5 steps"
+        response = "목표 위치: 100, 120, 140, 160, 180 steps"
         result = planner._parse_response(response, n=5)
-        assert result == [-5, -3, 0, 3, 5]
+        assert result == [100, 120, 140, 160, 180]
 
-    def test_no_integers_raises(self, planner: LLMPlanner) -> None:
-        with pytest.raises(ValueError, match="정수를 추출할 수 없음"):
-            planner._parse_response("이동값이 없습니다.", n=5)
+    def test_no_valid_positions_raises(self, planner: LLMPlanner) -> None:
+        with pytest.raises(ValueError, match="유효한 위치를 추출할 수 없음"):
+            planner._parse_response("위치가 없습니다.", n=5)
 
     def test_float_values_converted_to_int(self, planner: LLMPlanner) -> None:
-        result = planner._parse_response("[-5.0, 0.0, 5.0]", n=3)
-        assert result == [-5, 0, 5]
+        result = planner._parse_response("[100.0, 150.0, 200.0]", n=3)
+        assert result == [100, 150, 200]
         assert all(isinstance(v, int) for v in result)
+
+    def test_thinking_tag_stripped(self, planner: LLMPlanner) -> None:
+        response = (
+            "<think>keff가 1.3이니까 삽입해야...</think>\n"
+            "[100, 120, 140, 160, 180]"
+        )
+        result = planner._parse_response(response, n=5)
+        assert result == [100, 120, 140, 160, 180]
+
+    def test_thinking_only_raises(self, planner: LLMPlanner) -> None:
+        response = "<think>생각 중...</think>"
+        with pytest.raises(ValueError, match="정수를 추출할 수 없음"):
+            planner._parse_response(response, n=5)
+
+    def test_thinking_with_numbers_ignored(self, planner: LLMPlanner) -> None:
+        response = (
+            "<think>step 1에서 keff가 1.005라면 위치 100</think>\n"
+            "[110, 120, 130, 140, 150]"
+        )
+        result = planner._parse_response(response, n=5)
+        assert result == [110, 120, 130, 140, 150]
+
+    def test_filters_out_of_range_in_regex(self, planner: LLMPlanner) -> None:
+        """정규식 폴백 시 0~228 범위 밖 값은 필터링."""
+        response = "위치 후보: 500, 100, 150, 300"
+        result = planner._parse_response(response, n=5)
+        assert result == [100, 150]
 
 
 class TestFallbackCandidates:
     """_fallback_candidates 테스트."""
 
     def test_returns_n_candidates(self, planner: LLMPlanner) -> None:
-        candidates = planner._fallback_candidates(n=10)
+        candidates = planner._fallback_candidates(
+            current_position=150, n=10, max_movement=50,
+        )
         assert len(candidates) == 10
 
-    def test_includes_zero(self, planner: LLMPlanner) -> None:
-        candidates = planner._fallback_candidates(n=10)
-        assert 0 in candidates
+    def test_includes_current_position(self, planner: LLMPlanner) -> None:
+        candidates = planner._fallback_candidates(
+            current_position=150, n=10, max_movement=50,
+        )
+        assert 150 in candidates
 
     def test_all_integers(self, planner: LLMPlanner) -> None:
-        candidates = planner._fallback_candidates(n=10)
+        candidates = planner._fallback_candidates(
+            current_position=150, n=10, max_movement=50,
+        )
         assert all(isinstance(v, int) for v in candidates)
+
+    def test_within_range(self, planner: LLMPlanner) -> None:
+        candidates = planner._fallback_candidates(
+            current_position=10, n=10, max_movement=50,
+        )
+        assert all(0 <= v <= 60 for v in candidates)
+
+    def test_clamped_at_boundary(self, planner: LLMPlanner) -> None:
+        candidates = planner._fallback_candidates(
+            current_position=220, n=5, max_movement=50,
+        )
+        assert all(0 <= v <= 228 for v in candidates)
 
 
 class TestBuildUserPrompt:
@@ -96,15 +144,22 @@ class TestBuildUserPrompt:
         prompt = planner._build_user_prompt(state, rod_position=200, n=10)
         assert "1.005" in prompt
 
-    def test_includes_history(self, planner: LLMPlanner) -> None:
-        state = ReactorState(
-            history=[
-                SimulationResult(keff=1.01, keff_std=0.001, runtime=10.0),
-                SimulationResult(keff=1.005, keff_std=0.001, runtime=10.0),
-            ]
-        )
+    def test_includes_absolute_position_instruction(self, planner: LLMPlanner) -> None:
+        state = ReactorState()
         prompt = planner._build_user_prompt(state, rod_position=200, n=10)
+        assert "목표 위치" in prompt
+
+    def test_includes_history(self, planner: LLMPlanner) -> None:
+        state = ReactorState()
+        history_log = [
+            {"step": 0, "rod_position_after": 200, "keff": 1.05, "keff_std": 0.001},
+            {"step": 1, "rod_position_after": 180, "keff": 1.02, "keff_std": 0.001},
+        ]
+        prompt = planner._build_user_prompt(
+            state, rod_position=180, n=10, history_log=history_log,
+        )
         assert "이력" in prompt
+        assert "위치=200" in prompt
 
 
 class TestGenerate:
@@ -112,22 +167,60 @@ class TestGenerate:
 
     @patch.object(LLMPlanner, "_call_llm")
     def test_success(self, mock_call: MagicMock, planner: LLMPlanner) -> None:
-        mock_call.return_value = "[-5, -3, -1, 0, 1, 3, 5, 7, 10, -10]"
+        mock_call.return_value = "[100, 110, 120, 130, 140, 150, 160, 170, 180, 190]"
         state = ReactorState()
 
         result = planner.generate(state, current_rod_position=200, n=10)
 
         assert len(result) == 10
-        assert result[0] == -5
+        # 모든 후보는 max_movement(50) 범위 내: 150~228
+        assert all(150 <= p <= 228 for p in result)
 
     @patch.object(LLMPlanner, "_call_llm")
-    def test_llm_failure_uses_fallback(
+    def test_retry_on_parse_failure(
         self, mock_call: MagicMock, planner: LLMPlanner
     ) -> None:
+        """파싱 실패 시 리트라이한다."""
+        mock_call.side_effect = [
+            "<think>생각만...</think>",  # 1차: 파싱 실패
+            "[150, 160, 170, 180, 190]",  # 2차: 성공
+        ]
+        state = ReactorState()
+
+        result = planner.generate(
+            state, current_rod_position=200, n=5, max_retries=3,
+        )
+
+        assert len(result) == 5
+        assert mock_call.call_count == 2
+
+    @patch.object(LLMPlanner, "_call_llm")
+    def test_all_retries_fail_uses_fallback(
+        self, mock_call: MagicMock, planner: LLMPlanner
+    ) -> None:
+        """모든 리트라이 실패 시 폴백 사용."""
         mock_call.side_effect = ConnectionError("서버 연결 실패")
         state = ReactorState()
 
-        result = planner.generate(state, current_rod_position=200, n=10)
+        result = planner.generate(
+            state, current_rod_position=200, n=10, max_retries=2,
+        )
 
         assert len(result) == 10
-        assert 0 in result  # 폴백은 항상 0 포함
+        assert 200 in result  # 폴백은 현재 위치 포함
+        assert mock_call.call_count == 3  # 1 + 2 retries
+
+    @patch.object(LLMPlanner, "_call_llm")
+    def test_clamped_to_max_movement(
+        self, mock_call: MagicMock, planner: LLMPlanner
+    ) -> None:
+        """max_movement 범위로 클램핑."""
+        mock_call.return_value = "[0, 50, 100, 228]"
+        state = ReactorState()
+
+        result = planner.generate(
+            state, current_rod_position=150, n=4, max_movement=30,
+        )
+
+        # 150 ± 30 = [120, 180] 범위로 클램핑
+        assert all(120 <= p <= 180 for p in result)
