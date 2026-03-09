@@ -51,17 +51,23 @@ class LLMController(BaseController):
         self._last_scored: list[ScoredCandidate] = []
         self._last_best: ScoredCandidate | None = None
 
-        # 기존 로그가 있으면 GP 재피팅
-        observations = self._log_store.get_observations()
-        if observations:
-            self._optimizer.refit(observations)
-            self._step = len(observations)
-            self._rod_position = observations[-1][0]
-            logger.info(
-                "기존 로그 복원: step=%d, rod_position=%.1f",
-                self._step,
-                self._rod_position,
-            )
+        # 기존 로그 처리: resume_from_log=True일 때만 복원
+        if config.resume_from_log:
+            observations = self._log_store.get_observations()
+            if observations:
+                self._optimizer.refit(observations)
+                self._step = len(observations)
+                self._rod_position = observations[-1][0]
+                logger.info(
+                    "기존 로그 복원: step=%d, rod_position=%.1f",
+                    self._step,
+                    self._rod_position,
+                )
+        else:
+            # 기존 로그가 있으면 삭제하고 초기 상태로 시작
+            if self._log_store.log_path.exists():
+                self._log_store.log_path.unlink()
+                logger.info("기존 로그 초기화 (resume_from_log=False)")
 
     @property
     def config(self) -> LLMControllerConfig:

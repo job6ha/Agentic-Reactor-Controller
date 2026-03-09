@@ -136,6 +136,7 @@ def run_blueprint_llm(bp: dict, runs_dir: Path) -> BenchmarkResult:
         keff_tolerance=0.05,
         keff_critical_deviation=1.0,
         log_dir=log_dir,
+        resume_from_log=False,
     )
 
     controller = create_controller(config)
@@ -465,6 +466,14 @@ def main() -> None:
     logger.info("블루프린트 %d개 로드, 병렬 워커 %d개", len(blueprints), N_WORKERS)
 
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # LLM 로그 초기화 (이전 실행의 stale 로그 방지, 방어적 2차 보호)
+    # 1차 보호: LLMController가 resume_from_log=False일 때 자체적으로 로그를 삭제
+    for bp in blueprints:
+        log_file = RUNS_DIR / f"llm_logs_{bp['name']}" / "log.json"
+        if log_file.exists():
+            log_file.unlink()
+            logger.info("이전 LLM 로그 삭제: %s", log_file)
 
     # 블루프린트 이름 순서 보존용 (결과 정렬)
     bp_names = [bp["name"] for bp in blueprints]

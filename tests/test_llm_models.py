@@ -71,6 +71,14 @@ class TestLLMControllerConfig:
         with pytest.raises(ValidationError):
             LLMControllerConfig(rod_position_min=100, rod_position_max=100)
 
+    def test_resume_from_log_default_false(self) -> None:
+        config = LLMControllerConfig()
+        assert config.resume_from_log is False
+
+    def test_resume_from_log_explicit_true(self) -> None:
+        config = LLMControllerConfig(resume_from_log=True)
+        assert config.resume_from_log is True
+
 
 class TestScoredCandidate:
     """ScoredCandidate 모델 테스트."""
