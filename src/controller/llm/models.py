@@ -32,6 +32,7 @@ class LLMControllerConfig(BaseModel):
         keff_critical_deviation: keff 이탈 판정 기준 (이 이상이면 종료).
         max_iterations: 최대 반복 횟수 (= depletion step 수).
         log_dir: 로그 저장 디렉토리.
+        resume_from_log: True이면 기존 로그에서 상태를 복원한다. False이면 초기 상태로 시작.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -90,6 +91,10 @@ class LLMControllerConfig(BaseModel):
     log_dir: Path = Field(
         default=Path("runs/llm_logs"),
         description="로그 저장 디렉토리",
+    )
+    resume_from_log: bool = Field(
+        default=False,
+        description="True이면 기존 로그에서 상태를 복원한다. False이면 항상 초기 상태로 시작한다.",
     )
 
     @model_validator(mode="after")
