@@ -6,6 +6,7 @@ meta/config.json에 CaseConfig를 직렬화하여 저장한다.
 
 import json
 import re
+import threading
 from pathlib import Path
 
 from src.armi_layer.models import CaseConfig, RunStatus
@@ -15,6 +16,12 @@ CASE_DIR_PATTERN = re.compile(r"^case_(\d{4})$")
 
 # 케이스 내부 서브 디렉토리
 CASE_SUBDIRS = ("input", "output", "meta")
+
+# 병렬 실행 시 케이스 번호 할당 경합 방지용 락
+_case_number_lock = threading.Lock()
+
+# 동일 프로세스 내 race condition 재시도 상한
+_MAX_CREATE_RETRIES = 10
 
 
 def _find_next_case_number(runs_dir: Path) -> int:
@@ -61,16 +68,29 @@ def create_case(
 
     runs_dir.mkdir(parents=True, exist_ok=True)
 
-    case_number = _find_next_case_number(runs_dir)
-    case_dir = runs_dir / f"case_{case_number:04d}"
+    # 병렬 실행 시 TOCTOU race condition 방지: 락 + 재시도
+    with _case_number_lock:
+        for _ in range(_MAX_CREATE_RETRIES):
+            case_number = _find_next_case_number(runs_dir)
+            case_dir = runs_dir / f"case_{case_number:04d}"
 
-    # 경합 조건 방지: 이미 존재하면 에러
-    if case_dir.exists():
-        raise FileExistsError(f"케이스 폴더가 이미 존재합니다: {case_dir}")
+            if case_dir.exists():
+                continue
 
-    # 서브 디렉토리 생성
-    for subdir in CASE_SUBDIRS:
-        (case_dir / subdir).mkdir(parents=True)
+            # 서브 디렉토리 생성 (mkdir로 원자적 점유)
+            try:
+                (case_dir / CASE_SUBDIRS[0]).mkdir(parents=True)
+                break
+            except FileExistsError:
+                continue
+        else:
+            raise FileExistsError(
+                f"케이스 폴더 생성 실패: {_MAX_CREATE_RETRIES}회 재시도 초과 ({runs_dir})"
+            )
+
+    # 나머지 서브 디렉토리 생성 (input은 이미 생성됨)
+    for subdir in CASE_SUBDIRS[1:]:
+        (case_dir / subdir).mkdir(parents=True, exist_ok=True)
 
     # config.json 저장
     config_path = case_dir / "meta" / "config.json"

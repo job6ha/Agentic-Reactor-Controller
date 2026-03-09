@@ -251,11 +251,12 @@ class TestLogRestoration:
     """기존 로그 복원 테스트."""
 
     def test_restores_from_existing_log(self, tmp_path: Path) -> None:
-        """기존 로그가 있으면 상태를 복원한다."""
+        """기존 로그가 있으면 상태를 복원한다 (resume_from_log=True)."""
         config = LLMControllerConfig(
             n_candidates=5,
             max_iterations=10,
             log_dir=tmp_path / "logs",
+            resume_from_log=True,
         )
 
         # 1차 컨트롤러: 2 스텝 실행
